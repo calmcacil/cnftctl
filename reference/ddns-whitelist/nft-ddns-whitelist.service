@@ -1,0 +1,8 @@
+[Unit]
+Description=Update nftables DDNS SSH whitelist
+Wants=network-online.target nftables.service
+After=network-online.target nftables.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/update-nft-ddns-whitelist

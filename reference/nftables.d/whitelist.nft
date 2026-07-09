@@ -1,0 +1,25 @@
+# Static administrative source addresses allowed to SSH.
+#
+# Non-whitelisted public SSH is blocked by nftables.conf.
+# Dynamic DDNS whitelist entries are handled separately by ddns_whitelist_v4 and
+# ddns_whitelist_v6 runtime sets.
+# VPN interfaces defined in VPN_IFS are trusted separately and do not need to be
+# listed here.
+#
+# Keep this list narrow. Add only addresses or prefixes you control.
+#
+# Format examples:
+#   IPv4 host:   203.0.113.10
+#   IPv4 subnet: 198.51.100.0/24
+#   IPv6 host:   2001:db8:1234::10
+#   IPv6 subnet: 2001:db8:1234::/48
+
+# TEST-NET-3 example address. Replace before use.
+define whitelist_v4 = {
+    203.0.113.10
+}
+
+# Documentation-prefix example address. Replace before use.
+define whitelist_v6 = {
+    2001:db8::10
+}

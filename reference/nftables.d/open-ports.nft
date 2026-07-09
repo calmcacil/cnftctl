@@ -1,0 +1,26 @@
+# Consolidated WAN Open Ports Set
+#
+# WARNING:
+# Every port listed here is public from WAN for BOTH:
+# - host services on this machine (input path)
+# - Docker-published container services (forwarding path)
+#
+# Docker may publish additional ports, but WAN traffic to those ports is blocked
+# unless the protocol/port is explicitly listed here.
+#
+# Format:
+#   <protocol> . <port_or_range>
+
+set open_ports {
+    typeof meta l4proto . th dport
+    flags interval
+    elements = {
+        # Reverse proxy / web
+        tcp . 443,      # HTTPS / reverse proxy
+        # Optional examples for new machines:
+        # tcp . 80,        # HTTP
+        # udp . 41641,     # Tailscale direct connectivity; DERP fallback works without this
+        # tcp . 25565,     # Minecraft
+        # udp . 25565,     # Minecraft
+    }
+}

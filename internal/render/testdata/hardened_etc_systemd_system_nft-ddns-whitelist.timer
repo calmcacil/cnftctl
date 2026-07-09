@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh nftables DDNS SSH whitelist periodically
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=5m
+AccuracySec=30s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

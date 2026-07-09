@@ -1,0 +1,71 @@
+# Disabled future release-build workflow.
+#
+# This file is intentionally outside .github/workflows/ so GitHub Actions will
+# not execute it. Do not move it into .github/workflows/ until release
+# publishing, tag policy, artifact contents, and signing requirements have been
+# reviewed and explicitly enabled.
+
+name: Release Build
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build release artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Validate repository
+        run: sh ./scripts/check.sh
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          mkdir -p "dist/cnftctl_${version}_${GOOS}_${GOARCH}"
+          go build -trimpath -ldflags "-s -w -X main.version=${version}" -o "dist/cnftctl_${version}_${GOOS}_${GOARCH}/cnftctl" ./cmd/cnftctl
+          cp README.md docs/release-notes.md docs/manual-validation.md examples/config.yaml examples/preset.v1.json "dist/cnftctl_${version}_${GOOS}_${GOARCH}/"
+          tar -C dist -czf "dist/cnftctl_${version}_${GOOS}_${GOARCH}.tar.gz" "cnftctl_${version}_${GOOS}_${GOARCH}"
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum *.tar.gz > checksums-${{ matrix.goos }}-${{ matrix.goarch }}.txt
+
+      # Intentionally disabled until release publishing is approved:
+      # - no GitHub Release creation
+      # - no public artifact upload
+      # - no tag creation or mutation
+      # - no package publishing
+      # - no signing keys or secrets

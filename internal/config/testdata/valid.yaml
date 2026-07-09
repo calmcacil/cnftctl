@@ -1,0 +1,36 @@
+version: 1
+wan_interface: eth0
+open_ports:
+    - protocol: tcp
+      port: 443
+      comment: https
+ssh:
+    mode: whitelist-rate-limit
+    rate_limit:
+        connections: 6
+        per: 1m0s
+    static_whitelist:
+        ipv4:
+            - 198.51.100.10
+            - 203.0.113.0/24
+        ipv6:
+            - 2001:db8::10
+            - 2001:db8:abcd::/56
+    ddns_whitelist:
+        enabled: true
+        hosts:
+            - home.example.com
+        ttl: 1h0m0s
+        refresh_interval: 5m0s
+        ipv6_prefix_len: 56
+trusted_interfaces:
+    enabled: true
+    interfaces:
+        - tailscale0
+    trust_forwarding: false
+docker:
+    enabled: true
+    allow_published_ports_by_default: false
+    interfaces:
+        - docker0
+        - br-*

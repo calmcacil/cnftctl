@@ -1,71 +1,47 @@
 # Release Process
 
-This repository uses SemVer for versioning and Conventional Commits for commit-message consistency. Release publishing is not enabled yet.
+Releases use SemVer tags `vMAJOR.MINOR.PATCH` and Conventional Commits by convention. Firewall semantics, config/preset compatibility, transaction behavior, and CLI automation contracts are compatibility surfaces. Before `v1.0.0`, any breaking change must still be explicit in release notes.
 
-## Current Automation
+## Supported Artifact
 
-- Active CI lives in `.github/workflows/ci.yml` and runs on pull requests, pushes to `main`, and manual dispatch.
-- CI runs formatting, tests, vet, and a CLI build with repository-local commands only.
-- Future release-build scaffolding lives in `.github/workflows-disabled/release-build.yml` and is intentionally not executable by GitHub Actions.
+The canonical release artifact is exactly `cnftctl-VERSION-debian13-amd64.tar.gz`. A standalone binary is not a supported installation because apply verifies installed systemd and manifest assets.
 
-## SemVer Policy
+**Production status is NOT READY** until this exact artifact completes the evidence gate below on Debian 13 amd64. The architecture contract and successful source checks are necessary but are not release evidence.
 
-Use tags in the form `vMAJOR.MINOR.PATCH` when releases are enabled.
+The canonical remaining-work gate is `docs/production-readiness.md`. Record exact candidate and host results in `docs/validation-record.md`, using `docs/manual-validation.md` for executable steps.
 
-- Increment `MAJOR` for incompatible CLI, config, preset, or firewall behavior changes.
-- Increment `MINOR` for backward-compatible features, commands, config options, or release artifact additions.
-- Increment `PATCH` for bug fixes, documentation corrections, validation improvements, and non-breaking test or build changes.
+## Required Evidence
 
-Before `v1.0.0`, minor versions may still include breaking changes, but release notes must call out those changes clearly. Be conservative when versioning changes that affect firewall behavior, SSH safety, rollback behavior, or config compatibility.
+The release issue and release body must identify:
 
-Do not create or push release tags until release publishing is explicitly approved.
+- Tag, immutable commit SHA, artifact filename, byte size, and SHA-256.
+- CI run URL for the tagged commit and successful formatting, tests, vet, build, bundle, and staged-asset checks.
+- Bundle manifest and successful offline `verify-bundle` output.
+- Completed `docs/manual-validation.md` evidence from disposable Debian 13 amd64 hosts.
+- nftables, systemd, kernel, and Docker versions exercised.
+- First-install timeout deletion, prior-generation rollback, confirmation, session death, reboot reconciliation, DDNS, coexistence, Docker-table preservation, install, upgrade, and uninstall results.
+- Dependency and Apache-2.0/third-party notice review.
+- Known limitations, unsupported environments, and operator-impacting changes.
+- Reviewer approval from someone other than the artifact producer.
 
-## Conventional Commits
+Do not describe an unexecuted check as passed. Record unsupported or unexercised cases explicitly.
 
-Use this format:
+## Publication
 
-```text
-<type>[optional scope]: <description>
-```
+1. Update release notes and support documentation.
+2. Run `sh ./scripts/check.sh` and delivery-asset verification.
+3. Build the bundle from the intended commit with the intended version.
+4. Verify the archive after extraction and record its checksum.
+5. Complete exact-artifact manual validation.
+6. Complete `docs/validation-record.md` and obtain independent approval.
+7. Create the SemVer tag only after evidence and approval are complete.
+8. Publish the archive and checksum/provenance evidence together.
+9. Download the public artifact in a clean environment and repeat bundle verification.
 
-Common types:
+Release automation must use least privilege, pin third-party actions to immutable commits, avoid `pull_request_target` for untrusted code, and expose no release secrets to pull-request jobs. Never force-push or silently replace a published artifact; issue a new version.
 
-- `feat`: user-visible feature or behavior addition.
-- `fix`: bug fix.
-- `docs`: documentation-only change.
-- `test`: test-only change.
-- `ci`: CI or workflow change.
-- `build`: build, packaging, or dependency-management change.
-- `refactor`: internal restructuring without behavior change.
-- `chore`: maintenance not covered by other types.
+The dormant workflows remain under `.github/workflows-disabled/` and must not be enabled piecemeal. Eventual activation must move them, without content or filename changes, to `.github/workflows/release-build.yml` and `.github/workflows/release-promote.yml`. The promotion workflow deliberately verifies attestations against the activated build path `actions/workflows/release-build.yml@$GITHUB_SHA`; changing that destination or the build workflow name requires updating and validating the promotion identity checks before activation.
 
-Breaking changes should use `!` after the type or scope and include a `BREAKING CHANGE:` footer.
+## Commit Convention
 
-Examples:
-
-```text
-ci: add Go validation workflow
-feat(config): add DDNS IPv6 prefix option
-fix(apply): reject concurrent transactions
-feat(config)!: rename SSH mode field
-
-BREAKING CHANGE: configs using ssh.mode must migrate to ssh.access_mode.
-```
-
-Commit-message linting is not enforced yet. If enforcement is added later, it must avoid `pull_request_target` and must not expose secrets to untrusted pull request code.
-
-## Disabled Release Build
-
-The disabled release scaffold is a draft for future Linux binary packaging. It is kept outside `.github/workflows/` so GitHub Actions will not run it.
-
-Before enabling release automation:
-
-- Confirm `docs/manual-validation.md` passes on a disposable or recoverable host.
-- Confirm artifact contents contain only intentional sanitized files.
-- Confirm `checksums.txt` generation and publication expectations.
-- Confirm tag protection or signing policy.
-- Confirm whether binary signing is required.
-- Confirm GitHub Release publishing permissions.
-- Review workflow permissions before granting any write access.
-
-Until those items are complete, do not publish GitHub Releases, upload public release assets, create or push tags, publish packages, or require repository secrets for releases.
+Use `<type>[optional scope]: <description>`, commonly `feat`, `fix`, `docs`, `test`, `ci`, `build`, `refactor`, or `chore`. Mark breaking changes with `!` and a `BREAKING CHANGE:` footer. Commit-message linting is not currently enforced.

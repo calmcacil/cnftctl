@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net"
 	"net/netip"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -100,6 +102,60 @@ func TestRefreshDoesNotTouchRuntimeOnResolutionFailure(t *testing.T) {
 	}
 	if runtime.called {
 		t.Fatal("runtime refresh must not be called when resolution fails")
+	}
+}
+
+type errorResolver struct {
+	a             []netip.Addr
+	aErr, aaaaErr error
+}
+
+func (r errorResolver) LookupA(context.Context, string) ([]netip.Addr, error) { return r.a, r.aErr }
+func (r errorResolver) LookupAAAA(context.Context, string) ([]netip.Addr, error) {
+	return nil, r.aaaaErr
+}
+
+func TestResolveAllowsPerFamilyAuthoritativeNoData(t *testing.T) {
+	cfg := Config{Enabled: true, Hosts: []string{"home.example.com"}}
+	result, err := Resolve(context.Background(), cfg, errorResolver{a: []netip.Addr{netip.MustParseAddr("203.0.113.10")}, aaaaErr: &net.DNSError{Err: "no data", IsNotFound: true}})
+	if err != nil || len(result.IPv4) != 1 {
+		t.Fatalf("result=%#v err=%v", result, err)
+	}
+}
+
+func TestResolveRejectsTransientFailureAndUnusableHost(t *testing.T) {
+	cfg := Config{Enabled: true, Hosts: []string{"home.example.com"}}
+	_, err := Resolve(context.Background(), cfg, errorResolver{a: []netip.Addr{netip.MustParseAddr("203.0.113.10")}, aaaaErr: &net.DNSError{Err: "timeout", IsTimeout: true}})
+	if err == nil || !strings.Contains(err.Error(), "AAAA") {
+		t.Fatalf("expected transient failure, got %v", err)
+	}
+	_, err = Resolve(context.Background(), cfg, errorResolver{aErr: &net.DNSError{Err: "no data", IsNotFound: true}, aaaaErr: &net.DNSError{Err: "no data", IsNotFound: true}})
+	if err == nil || !strings.Contains(err.Error(), "no usable") {
+		t.Fatalf("expected unusable host, got %v", err)
+	}
+}
+
+func TestRecordAttemptPersistsOperationalMetadata(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "state", "ddns.json")
+	now := time.Date(2026, 7, 12, 12, 0, 0, 0, time.UTC)
+	result := RefreshResult{IPv4: []netip.Addr{netip.MustParseAddr("203.0.113.10")}}
+	metadata, err := RecordAttempt(path, Metadata{}, result, time.Hour, nil, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := LoadMetadata(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.Attempts != 1 || loaded.IPv4Count != 1 || loaded.ContentHash == "" || !loaded.ExpiresAt.Equal(now.Add(time.Hour)) {
+		t.Fatalf("metadata=%#v", loaded)
+	}
+	loaded, err = RecordAttempt(path, metadata, RefreshResult{}, time.Hour, &net.DNSError{Err: "timeout", IsTimeout: true}, now.Add(time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.Attempts != 2 || loaded.ErrorCode != "dns_timeout" || !loaded.LastSuccess.Equal(now) {
+		t.Fatalf("metadata=%#v", loaded)
 	}
 }
 

@@ -3,6 +3,7 @@ package config
 import (
 	"bytes"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -18,6 +19,20 @@ func TestDefaultValidates(t *testing.T) {
 	}
 	if len(cfg.Docker.Interfaces) != 2 || cfg.Docker.Interfaces[1] != "br-*" {
 		t.Fatalf("unexpected docker defaults: %#v", cfg.Docker.Interfaces)
+	}
+}
+
+func TestSaveFileCreatesDurableAtomicFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "nested", "config.yaml")
+	if err := SaveFile(path, Default(), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(path)
+	if err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("stat=%v err=%v", info, err)
+	}
+	if _, err := LoadFile(path); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -75,8 +90,8 @@ func TestValidateRejectsBadValues(t *testing.T) {
 	cfg.OpenPorts = []OpenPort{{Protocol: "icmp", Port: 0, EndPort: 70000}}
 	cfg.SSH.Mode = "closed"
 	cfg.SSH.RateLimit = &RateLimit{Connections: 0, Per: Duration{}}
-	cfg.SSH.StaticWhitelist.IPv4 = []string{"example.com", "2001:db8::1"}
-	cfg.SSH.StaticWhitelist.IPv6 = []string{"198.51.100.1"}
+	cfg.SSH.StaticWhitelist.IPv4 = []WhitelistEntry{{Value: "example.com"}, {Value: "2001:db8::1"}}
+	cfg.SSH.StaticWhitelist.IPv6 = []WhitelistEntry{{Value: "198.51.100.1"}}
 	cfg.SSH.DDNSWhitelist.Hosts = []string{"-bad.example", "192.0.2.1"}
 	cfg.SSH.DDNSWhitelist.TTL = Duration{}
 	cfg.SSH.DDNSWhitelist.RefreshInterval = Duration{}
@@ -115,16 +130,91 @@ func TestRiskExplanations(t *testing.T) {
 	cfg := Default()
 	cfg.OpenPorts = []OpenPort{{Protocol: "tcp", Port: 443}}
 	cfg.SSH.Mode = "whitelist-only"
-	cfg.SSH.StaticWhitelist.IPv4 = []string{"198.51.100.0/24"}
+	cfg.SSH.StaticWhitelist.IPv4 = []WhitelistEntry{{Value: "198.51.100.0/24"}}
 	cfg.SSH.DDNSWhitelist.Enabled = true
 	cfg.TrustedInterfaces.Enabled = true
 	cfg.TrustedInterfaces.TrustForwarding = true
 	cfg.Docker.Enabled = true
-	cfg.Docker.AllowPublishedPortsByDefault = true
 	risks := strings.Join(cfg.RiskExplanations(), "\n")
-	for _, want := range []string{"public tcp port 443", "whitelist-only", "broad SSH static whitelist", "DDNS", "trusted interfaces", "forwarding", "Docker integration", "allow_published_ports_by_default"} {
+	for _, want := range []string{"public tcp port 443", "whitelist-only", "broad SSH static whitelist", "DDNS", "trusted interfaces", "forwarding", "Docker integration"} {
 		if !strings.Contains(risks, want) {
 			t.Fatalf("expected risk %q in:\n%s", want, risks)
 		}
 	}
+}
+
+func TestStructuredWhitelistCommentsRoundTrip(t *testing.T) {
+	cfg := Default()
+	cfg.SSH.StaticWhitelist.IPv4 = []WhitelistEntry{{Value: "198.51.100.7/24", Comment: " office "}}
+	var out bytes.Buffer
+	if err := Save(&out, cfg); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := Load(bytes.NewReader(out.Bytes()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry := loaded.SSH.StaticWhitelist.IPv4[0]
+	if entry.Value != "198.51.100.0/24" || entry.Comment != "office" {
+		t.Fatalf("unexpected canonical entry: %#v", entry)
+	}
+}
+
+func TestValidateSemanticInvariants(t *testing.T) {
+	tests := []struct {
+		name string
+		edit func(*Config)
+		want string
+	}{
+		{"hardened without trust", func(c *Config) { c.SSH.Mode = "whitelist-only" }, "effective static or enabled DDNS"},
+		{"rate limit wrong mode", func(c *Config) { c.SSH.RateLimit = &RateLimit{Connections: 1, Per: Duration{Duration: time.Second}} }, "only valid"},
+		{"rate limit unit", func(c *Config) {
+			c.SSH.Mode = "whitelist-rate-limit"
+			c.SSH.StaticWhitelist.IPv4 = []WhitelistEntry{{Value: "198.51.100.1"}}
+			c.SSH.RateLimit = &RateLimit{Connections: 1, Per: Duration{Duration: 2 * time.Second}}
+		}, "exactly 1s, 1m, or 1h"},
+		{"enabled DDNS empty", func(c *Config) { c.SSH.DDNSWhitelist.Enabled = true }, "must not be empty"},
+		{"forwarding disabled trust", func(c *Config) { c.TrustedInterfaces.TrustForwarding = true }, "requires trusted interfaces"},
+		{"duplicate port", func(c *Config) {
+			c.OpenPorts = []OpenPort{{Protocol: "tcp", Port: 443}, {Protocol: "TCP", Port: 443, EndPort: 443}}
+		}, "duplicates open_ports[0]"},
+		{"comment controls", func(c *Config) { c.OpenPorts = []OpenPort{{Protocol: "tcp", Port: 443, Comment: "bad\ncomment"}} }, "control characters"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := Default()
+			tc.edit(&cfg)
+			if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("expected %q, got %v", tc.want, err)
+			}
+		})
+	}
+}
+
+func TestLoadRejectsRemovedDockerField(t *testing.T) {
+	_, err := Load(strings.NewReader("version: 1\ndocker:\n  allow_published_ports_by_default: false\n"))
+	if err == nil || !strings.Contains(err.Error(), "allow_published_ports_by_default") {
+		t.Fatalf("expected removed field rejection, got %v", err)
+	}
+}
+
+func FuzzConfigYAML(f *testing.F) {
+	f.Add([]byte("version: 1\nssh:\n  mode: open\n"))
+	f.Add([]byte("version: 1\nunknown: true\n"))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		cfg, err := Load(bytes.NewReader(data))
+		if err != nil {
+			return
+		}
+		if err := cfg.Validate(); err != nil {
+			t.Fatalf("Load returned invalid config: %v", err)
+		}
+		var out bytes.Buffer
+		if err := Save(&out, cfg); err != nil {
+			t.Fatalf("save loaded config: %v", err)
+		}
+		if _, err := Load(bytes.NewReader(out.Bytes())); err != nil {
+			t.Fatalf("reload saved config: %v", err)
+		}
+	})
 }

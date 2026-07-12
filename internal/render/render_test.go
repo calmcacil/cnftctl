@@ -30,6 +30,35 @@ func TestFreshConfigSnapshot(t *testing.T) {
 	}
 }
 
+func TestGenerationFilesUseFinalAbsoluteIncludesAndNoSystemdUnits(t *testing.T) {
+	dir := "/var/lib/cnftctl/generations/0123456789abcdef"
+	files, err := GenerationFiles(Config{SSH: SSHConfig{DDNSWhitelist: DDNSWhitelist{Enabled: true}}}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 4 {
+		t.Fatalf("files = %#v", files)
+	}
+	if !strings.Contains(files[0].Content, `include "`+dir+`/whitelist.nft"`) || !strings.Contains(files[0].Content, OwnershipMarker) {
+		t.Fatalf("generation policy lacks final includes/marker:\n%s", files[0].Content)
+	}
+	for _, file := range files {
+		if strings.Contains(file.Path, "/systemd/") || file.Path == "/etc/nftables.conf" {
+			t.Fatalf("generation contains forbidden path %q", file.Path)
+		}
+	}
+}
+
+func TestFilesUseStableGenerationPlaceholder(t *testing.T) {
+	files, err := Files(Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(files[0].Content, GenerationPlaceholder+"/whitelist.nft") {
+		t.Fatalf("logical firewall does not use generation placeholder:\n%s", files[0].Content)
+	}
+}
+
 func TestHardenedDockerDDNSSnapshot(t *testing.T) {
 	cfg := Config{
 		WANInterface: "ens18",
@@ -96,6 +125,9 @@ func assertSnapshots(t *testing.T, cfg Config, prefix string) {
 		t.Fatal(err)
 	}
 	for _, file := range files {
+		if strings.HasPrefix(file.Path, "/var/lib/cnftctl/") {
+			continue
+		}
 		name := prefix + snapshotName(file.Path)
 		snapshotPath := filepath.Join("testdata", name)
 		if os.Getenv("UPDATE_SNAPSHOTS") == "1" {

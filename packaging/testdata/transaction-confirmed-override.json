@@ -1,0 +1,18 @@
+{
+  "id": "0123456789abcdef0123456789abcdef",
+  "phase": "confirmed",
+  "started_at": "2026-01-01T00:00:00Z",
+  "rollback_deadline": "2026-01-01T00:02:00Z",
+  "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "previous_generation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "fresh_install": false,
+  "firewall_was_enabled": true,
+  "confirmed": true,
+  "rolled_back": false,
+  "ssh_override": {
+    "acknowledged": true,
+    "reason": "current session was audited",
+    "source": "cli",
+    "context": "operator console"
+  }
+}

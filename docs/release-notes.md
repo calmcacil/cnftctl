@@ -1,79 +1,49 @@
-# cnftctl First Release Notes
+# Release Notes And Evidence Template
 
-This file is the release note and checklist template for the first `cnftctl` release.
+## Identity
 
-## Release Summary
+- Version/tag: `vX.Y.Z`
+- Commit: `FULL_SHA`
+- Artifact: `cnftctl-X.Y.Z-debian13-amd64.tar.gz`
+- Artifact SHA-256: `RECORD_AT_RELEASE`
+- CI run: `RECORD_AT_RELEASE`
+- Tester and UTC date: `RECORD_AT_RELEASE`
 
-`cnftctl` manages a specific nftables firewall profile for Linux hosts. The first release focuses on preserving the sanitized reference firewall behavior while adding a safer CLI-oriented workflow for configuration, validation, planning, and active-policy application.
+## Scope
 
-The project remains intentionally narrow. It is not a universal firewall manager.
+This release provides the narrow `inet hostfw` manager for Debian 13 amd64, including desired YAML configuration, immutable generations, dedicated systemd activation, mandatory dead-man rollback and boot reconciliation, SSH session coverage checks with audited override, optional DDNS SSH sets, and optional strict Docker WAN gating.
 
-## Included Scope
+**Production status: NOT READY** until every evidence placeholder below is replaced with results from the exact canonical `cnftctl-X.Y.Z-debian13-amd64.tar.gz` artifact on Debian 13 amd64. This template describes the intended release contract and is not proof that any implementation or artifact passed.
 
-- Go module: `github.com/calmcacil/cnftctl`.
-- Managed firewall profile: `inet hostfw`.
-- Baseline reference behavior from `reference/nftables.conf`.
-- Public WAN open-port model through `open_ports`.
-- SSH safety model with open-by-default behavior and explicit hardening.
-- Optional DDNS SSH whitelist behavior with `/56` default IPv6 prefix derivation and `/64` support.
-- Optional Docker WAN gating using the same open-port policy.
-- Sanitized examples for config and presets.
-- CI for formatting, tests, vet/static analysis, and CLI builds.
-- Disabled future release binary scaffolding kept outside active GitHub Actions workflows.
+The supported installation unit is the complete verified bundle. Installation does not activate firewall policy. Docker is never restarted automatically.
 
-## Security Highlights
+## Compatibility And Limitations
 
-- Active firewall policy changes must use a dead-man rollback flow.
-- `cnftctl confirm` must be required before the rollback timeout expires.
-- Presets are untrusted input and must not bypass validation or confirmation.
-- Docker daemon edits and restarts must require explicit consent.
-- Examples must not contain real domains, tokens, private addresses, or personal allowlists.
-- The binary name is `cnftctl`; do not publish an executable named `nftctl`.
+- Supported only on Debian 13 amd64 with systemd and nftables.
+- Not a general nftables manager; foreign tables remain outside project ownership.
+- Docker support gates published traffic but does not configure containers or restart Docker.
+- DDNS trusts configured DNS results and supports only `/56` or `/64` IPv6 derivation.
+- `doctor` currently performs the same checks as `status`.
+- The rollback timeout is fixed at 120 seconds.
+- Manual reference deployment is a behavior reference, not the supported bundle lifecycle.
+- `transactions list` reports pending transactions, not historical completed transactions.
+- Production use remains blocked until all exact-artifact evidence below passes; do not substitute source-tree or code-fix results.
 
-## Known Limitations To Confirm Before Publishing
+## Evidence
 
-- Confirm `./cmd/cnftctl` builds for the release commit.
-- Confirm the exact implemented command list before copying command examples into the GitHub release body.
-- Confirm the DDNS implementation strategy: retained POSIX updater or Go-native refresh.
-- Confirm Docker nftables backend behavior on target Docker Engine versions.
-- Confirm target distro nftables syntax compatibility.
+- CI checks: `PASS/FAIL` with URL.
+- Offline bundle verification: `PASS/FAIL` with output attachment.
+- First-install timeout/table deletion: `PASS/FAIL`.
+- Confirm and prior-generation rollback: `PASS/FAIL`.
+- Initiating-session death and reboot reconciliation: `PASS/FAIL`.
+- SSH override audit: `PASS/FAIL`.
+- DDNS refresh, expiry/freshness, and timer reconciliation: `PASS/FAIL`.
+- Foreign nftables and Docker table coexistence: `PASS/FAIL`.
+- Strict Docker WAN gate: `PASS/FAIL/NOT EXERCISED`.
+- Fresh install, upgrade, and uninstall: `PASS/FAIL`.
+- JSON schema and exit codes: `PASS/FAIL`.
+- Security/license/notice review: `PASS/FAIL`.
 
-## Release Checklist
+Attach the completed `docs/manual-validation.md` record. Replace every placeholder before publication; do not publish this template as evidence.
 
-- Run `go test ./...`.
-- Run `go vet ./...`.
-- Run `test -z "$(gofmt -l .)"`.
-- Run `go build -o ./bin/cnftctl ./cmd/cnftctl`.
-- Run the checklist in `docs/manual-validation.md` on a disposable or recoverable host.
-- Review `README.md`, `SPEC.md`, and examples for current command names and behavior.
-- Verify no examples or docs contain real secrets or personal infrastructure values.
-- Create a signed or protected release tag only after release publishing is explicitly enabled.
-- Confirm the disabled release workflow has been reviewed before moving it into active workflows.
-- Confirm the future release workflow builds Linux binaries and `checksums.txt` before enabling publication.
-- Attach manual validation notes to the release.
-
-## Suggested GitHub Release Body
-
-```markdown
-## cnftctl first release
-
-This release introduces the first packaged `cnftctl` workflow for managing the repository's nftables firewall profile.
-
-### Safety
-
-Firewall changes can lock you out of a remote host. Use console/rescue access and validate rollback before applying on a production machine.
-
-### Install
-
-Download the Linux binary for your architecture, verify `checksums.txt`, and install it as `/usr/local/bin/cnftctl`.
-
-### Validate
-
-Run `cnftctl init --dry-run`, review `cnftctl plan`, apply with the dead-man rollback flow, and confirm only after verifying access.
-
-### Notes
-
-- Docker integration is opt-in.
-- DDNS hostnames are part of the SSH trust boundary.
-- Presets are untrusted input and must be reviewed before use.
-```
+Also attach a completed copy of `docs/validation-record.md` and show that every mandatory item in `docs/production-readiness.md` is closed for the same artifact SHA-256.

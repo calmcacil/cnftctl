@@ -1,71 +1,76 @@
-# Disabled future release-build workflow.
-#
-# This file is intentionally outside .github/workflows/ so GitHub Actions will
-# not execute it. Do not move it into .github/workflows/ until release
-# publishing, tag policy, artifact contents, and signing requirements have been
-# reviewed and explicitly enabled.
-
-name: Release Build
+name: Release Candidate Build
 
 on:
-  push:
-    tags:
-      - 'v*.*.*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: SemVer without a leading v
+        required: true
+        type: string
 
 permissions:
   contents: read
+  id-token: write
+  attestations: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: release-candidate-${{ inputs.version }}
   cancel-in-progress: false
 
 jobs:
-  build:
-    name: Build release artifacts
+  build-once:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    strategy:
-      fail-fast: true
-      matrix:
-        include:
-          - goos: linux
-            goarch: amd64
-          - goos: linux
-            goarch: arm64
+    timeout-minutes: 20
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - name: Checkout exact release tag
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: v${{ inputs.version }}
+          persist-credentials: false
+      - name: Setup Go
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
         with:
           go-version-file: go.mod
           cache: true
-
-      - name: Validate repository
-        run: sh ./scripts/check.sh
-
-      - name: Build binary
+      - name: Verify tag and source version
         env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: "0"
+          VERSION: ${{ inputs.version }}
         run: |
-          version="${GITHUB_REF_NAME#v}"
-          mkdir -p "dist/cnftctl_${version}_${GOOS}_${GOARCH}"
-          go build -trimpath -ldflags "-s -w -X main.version=${version}" -o "dist/cnftctl_${version}_${GOOS}_${GOARCH}/cnftctl" ./cmd/cnftctl
-          cp README.md docs/release-notes.md docs/manual-validation.md examples/config.yaml examples/preset.v1.json "dist/cnftctl_${version}_${GOOS}_${GOARCH}/"
-          tar -C dist -czf "dist/cnftctl_${version}_${GOOS}_${GOARCH}.tar.gz" "cnftctl_${version}_${GOOS}_${GOARCH}"
-
-      - name: Generate checksums
+          test "$(git tag --points-at HEAD)" = "v$VERSION"
+          test "$(git rev-list -n 1 "v$VERSION^{commit}")" = "$GITHUB_SHA"
+          test "$GITHUB_REF_NAME" = "v$VERSION" || test "$GITHUB_EVENT_NAME" = workflow_dispatch
+      - name: Check source
+        run: sh ./scripts/check.sh
+      - name: Build bundle once
+        env:
+          VERSION: ${{ inputs.version }}
+        run: sh ./scripts/build-bundle.sh "$VERSION" "dist/cnftctl-$VERSION-debian13-amd64"
+      - name: Generate SPDX SBOM
         run: |
-          cd dist
-          sha256sum *.tar.gz > checksums-${{ matrix.goos }}-${{ matrix.goarch }}.txt
-
-      # Intentionally disabled until release publishing is approved:
-      # - no GitHub Release creation
-      # - no public artifact upload
-      # - no tag creation or mutation
-      # - no package publishing
-      # - no signing keys or secrets
+          go install github.com/anchore/syft/cmd/syft@v1.27.1
+          syft dir:dist -o spdx-json=dist/sbom.spdx.json
+      - name: Package and checksum candidate
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner -C dist -czf "cnftctl-$VERSION-debian13-amd64.tar.gz" "cnftctl-$VERSION-debian13-amd64"
+          sha256sum "cnftctl-$VERSION-debian13-amd64.tar.gz" dist/sbom.spdx.json > release-checksums.txt
+      - name: Attest bundle provenance
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.2.2
+        with:
+          subject-path: cnftctl-${{ inputs.version }}-debian13-amd64.tar.gz
+      - name: Attest SBOM
+        uses: actions/attest-sbom@49f9f8f01a66efd2e17363a7f9b9f2ba56e9ac21 # v2.2.1
+        with:
+          subject-path: cnftctl-${{ inputs.version }}-debian13-amd64.tar.gz
+          sbom-path: dist/sbom.spdx.json
+      - name: Upload immutable candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cnftctl-${{ inputs.version }}-candidate
+          path: |
+            cnftctl-${{ inputs.version }}-debian13-amd64.tar.gz
+            release-checksums.txt
+            dist/sbom.spdx.json
+          if-no-files-found: error
+          retention-days: 14

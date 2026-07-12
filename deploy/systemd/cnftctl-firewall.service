@@ -1,0 +1,34 @@
+[Unit]
+Description=Load the operator-approved cnftctl firewall profile
+Wants=network-pre.target
+Requires=cnftctl-reconcile.service
+Before=network-pre.target network.target
+After=local-fs.target cnftctl-reconcile.service
+ConditionPathExists=/var/lib/cnftctl/active/firewall.nft
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/nft -f /var/lib/cnftctl/active/firewall.nft
+User=root
+Group=root
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+ReadOnlyPaths=/var/lib/cnftctl
+
+[Install]
+WantedBy=network-pre.target

@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 const WarningDockerExposure = "docker_open_port_exposure"
@@ -106,7 +107,11 @@ func ParseEntry(protocol, portSpec, comment string) (Entry, error) {
 		return Entry{}, err
 	}
 
-	return Entry{Protocol: protocol, Start: start, End: end, Comment: strings.TrimSpace(comment)}, nil
+	comment = strings.TrimSpace(comment)
+	if strings.IndexFunc(comment, unicode.IsControl) >= 0 {
+		return Entry{}, errors.New("comment must not contain control characters")
+	}
+	return Entry{Protocol: protocol, Start: start, End: end, Comment: comment}, nil
 }
 
 func FormatPort(entry Entry) string {

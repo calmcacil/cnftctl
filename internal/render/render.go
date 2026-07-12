@@ -3,6 +3,7 @@ package render
 import (
 	"bytes"
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 	"text/template"
@@ -10,14 +11,18 @@ import (
 )
 
 const (
-	NftablesConfPath = "/etc/nftables.conf"
-	FragmentDir      = "/etc/cnftctl/nftables.d"
-	OpenPortsPath    = FragmentDir + "/open-ports.nft"
-	WhitelistPath    = FragmentDir + "/whitelist.nft"
-	DDNSHostsPath    = FragmentDir + "/ddns-hosts.conf"
-	DDNSServicePath  = "/etc/systemd/system/nft-ddns-whitelist.service"
-	DDNSTimerPath    = "/etc/systemd/system/nft-ddns-whitelist.timer"
+	NftablesConfPath        = "/var/lib/cnftctl/active/firewall.nft"
+	FragmentDir             = "/var/lib/cnftctl/active"
+	OpenPortsPath           = FragmentDir + "/open-ports.nft"
+	WhitelistPath           = FragmentDir + "/whitelist.nft"
+	DDNSHostsPath           = FragmentDir + "/ddns-hosts.conf"
+	DDNSServicePath         = "/etc/systemd/system/nft-ddns-whitelist.service"
+	DDNSTimerPath           = "/etc/systemd/system/nft-ddns-whitelist.timer"
+	GenerationPlaceholder   = "/var/lib/cnftctl/generations/{generation}"
+	GenerationIDPlaceholder = "{generation}"
 )
+
+const OwnershipMarker = "cnftctl-owned:inet-hostfw:v1"
 
 type SSHMode string
 
@@ -79,11 +84,29 @@ type File struct {
 
 func Files(cfg Config) ([]File, error) {
 	model := newModel(cfg)
+	model.FragmentDir = GenerationPlaceholder
+	model.Generation = GenerationIDPlaceholder
+	return policyFiles(model)
+}
+
+// GenerationFiles renders includes against the generation's final absolute path.
+func GenerationFiles(cfg Config, generationDir string) ([]File, error) {
+	clean := filepath.Clean(generationDir)
+	if !strings.HasPrefix(clean, "/var/lib/cnftctl/generations/") {
+		return nil, fmt.Errorf("generation directory %q is outside /var/lib/cnftctl/generations", generationDir)
+	}
+	model := newModel(cfg)
+	model.FragmentDir = clean
+	model.Generation = filepath.Base(clean)
+	return policyFiles(model)
+}
+
+func policyFiles(model model) ([]File, error) {
 
 	files := []File{
-		{Path: NftablesConfPath},
-		{Path: OpenPortsPath},
-		{Path: WhitelistPath},
+		{Path: filepath.Join(model.FragmentDir, "firewall.nft")},
+		{Path: filepath.Join(model.FragmentDir, "open-ports.nft")},
+		{Path: filepath.Join(model.FragmentDir, "whitelist.nft")},
 	}
 
 	var err error
@@ -101,20 +124,8 @@ func Files(cfg Config) ([]File, error) {
 	}
 
 	if model.DDNSEnabled {
-		ddnsFiles := []File{
-			{Path: DDNSHostsPath},
-			{Path: DDNSServicePath},
-			{Path: DDNSTimerPath},
-		}
+		ddnsFiles := []File{{Path: filepath.Join(model.FragmentDir, "ddns-hosts.conf")}}
 		ddnsFiles[0].Content, err = renderTemplate("ddns-hosts.conf", ddnsHostsTemplate, model)
-		if err != nil {
-			return nil, err
-		}
-		ddnsFiles[1].Content, err = renderTemplate("nft-ddns-whitelist.service", ddnsServiceTemplate, model)
-		if err != nil {
-			return nil, err
-		}
-		ddnsFiles[2].Content, err = renderTemplate("nft-ddns-whitelist.timer", ddnsTimerTemplate, model)
 		if err != nil {
 			return nil, err
 		}
@@ -125,7 +136,9 @@ func Files(cfg Config) ([]File, error) {
 }
 
 func NftablesConf(cfg Config) (string, error) {
-	return renderTemplate("nftables.conf", nftablesTemplate, newModel(cfg))
+	model := newModel(cfg)
+	model.FragmentDir = FragmentDir
+	return renderTemplate("nftables.conf", nftablesTemplate, model)
 }
 
 func OpenPorts(cfg Config) (string, error) {
@@ -137,6 +150,8 @@ func Whitelist(cfg Config) (string, error) {
 }
 
 type model struct {
+	FragmentDir       string
+	Generation        string
 	WANInterface      string
 	OpenPorts         []OpenPort
 	SSHMode           SSHMode

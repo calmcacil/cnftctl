@@ -1,0 +1,19 @@
+#!/bin/sh
+set -eu
+
+if [ "$#" -ne 1 ]; then
+    echo "usage: cnftctl-recover TRANSACTION_ID" >&2
+    exit 2
+fi
+
+case $1 in
+    *[!a-zA-Z0-9._-]*|'') echo "invalid transaction ID" >&2; exit 2 ;;
+esac
+
+state=/var/lib/cnftctl/transactions/$1/state.json
+if [ ! -f "$state" ]; then
+    echo "transaction state not found: $state" >&2
+    exit 1
+fi
+
+exec /usr/bin/cnftctl rollback "$1"

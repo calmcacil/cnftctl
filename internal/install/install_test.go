@@ -1,26 +1,13 @@
 package install
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
 
 	"github.com/calmcacil/cnftctl/internal/apply"
-	"github.com/calmcacil/cnftctl/internal/nft"
 )
-
-type fakeRunner struct{ results []nft.Result }
-
-func (f *fakeRunner) Run(_ context.Context, _ string, _ ...string) nft.Result {
-	if len(f.results) == 0 {
-		return nft.Result{}
-	}
-	res := f.results[0]
-	f.results = f.results[1:]
-	return res
-}
 
 func TestCheckRoot(t *testing.T) {
 	if err := CheckRoot(func() int { return 1000 }); err == nil {
@@ -106,4 +93,21 @@ func TestAdoptReference(t *testing.T) {
 	if len(adoption.OpenPorts) != 1 || adoption.OpenPorts[0].Port != "443" {
 		t.Fatalf("adoption = %#v", adoption)
 	}
+}
+
+func FuzzAdoptionParsers(f *testing.F) {
+	f.Add([]byte("tcp . 443,\n"), []byte("define whitelist_v4 = { 203.0.113.1 }\n"))
+	f.Fuzz(func(t *testing.T, portsData, whitelistData []byte) {
+		dir := t.TempDir()
+		portsPath := filepath.Join(dir, "ports.nft")
+		whitelistPath := filepath.Join(dir, "whitelist.nft")
+		if err := os.WriteFile(portsPath, portsData, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(whitelistPath, whitelistData, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		_, _, _ = ParseOpenPortsFile(portsPath)
+		_, _, _ = ParseWhitelistFile(whitelistPath)
+	})
 }

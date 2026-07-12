@@ -1,0 +1,26 @@
+[Unit]
+Description=Rollback unconfirmed cnftctl transaction %i
+ConditionPathIsDirectory=/var/lib/cnftctl/transactions/%i
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/cnftctl rollback %i
+User=root
+Group=root
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+ReadWritePaths=/var/lib/cnftctl /run/cnftctl

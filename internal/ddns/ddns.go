@@ -2,16 +2,24 @@ package ddns
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
 	"net/netip"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 )
 
-const DefaultIPv6PrefixLen = 56
+const (
+	DefaultIPv6PrefixLen = 56
+	MetadataPath         = "/var/lib/cnftctl/ddns-runtime.json"
+)
 
 type Config struct {
 	Enabled       bool
@@ -43,12 +51,28 @@ type RefreshResult struct {
 }
 
 type Status struct {
-	Enabled       bool
-	Hosts         []string
-	IPv6PrefixLen int
-	Configured    RefreshResult
-	Runtime       RuntimeEntries
-	RuntimeError  error
+	Enabled         bool
+	Hosts           []string
+	IPv6PrefixLen   int
+	Configured      RefreshResult
+	Runtime         RuntimeEntries
+	RuntimeError    error
+	ResolutionError error
+	Metadata        Metadata
+	MetadataError   error
+	Stale           bool
+}
+
+type Metadata struct {
+	Attempts     uint64    `json:"attempts"`
+	LastAttempt  time.Time `json:"last_attempt"`
+	LastSuccess  time.Time `json:"last_success,omitempty"`
+	ErrorCode    string    `json:"error_code,omitempty"`
+	ErrorSummary string    `json:"error_summary,omitempty"`
+	IPv4Count    int       `json:"ipv4_count"`
+	IPv6Count    int       `json:"ipv6_count"`
+	ContentHash  string    `json:"content_hash,omitempty"`
+	ExpiresAt    time.Time `json:"expires_at,omitempty"`
 }
 
 func Enable(cfg *Config) (bool, error) {
@@ -165,9 +189,9 @@ func Resolve(ctx context.Context, cfg Config, resolver Resolver) (RefreshResult,
 			return RefreshResult{}, err
 		}
 
-		addrs4, err := resolver.LookupA(ctx, host)
-		if err != nil {
-			return RefreshResult{}, fmt.Errorf("resolve A for %s: %w", host, err)
+		addrs4, err4 := resolver.LookupA(ctx, host)
+		if err4 != nil && !isAuthoritativeNoData(err4) {
+			return RefreshResult{}, fmt.Errorf("resolve A for %s: %w", host, err4)
 		}
 		for _, addr := range addrs4 {
 			if !addr.Is4() {
@@ -180,19 +204,29 @@ func Resolve(ctx context.Context, cfg Config, resolver Resolver) (RefreshResult,
 			}
 		}
 
-		addrs6, err := resolver.LookupAAAA(ctx, host)
-		if err != nil {
-			return RefreshResult{}, fmt.Errorf("resolve AAAA for %s: %w", host, err)
+		addrs6, err6 := resolver.LookupAAAA(ctx, host)
+		if err6 != nil && !isAuthoritativeNoData(err6) {
+			return RefreshResult{}, fmt.Errorf("resolve AAAA for %s: %w", host, err6)
+		}
+		usable := 0
+		for _, addr := range addrs4 {
+			if addr.Unmap().Is4() {
+				usable++
+			}
 		}
 		for _, addr := range addrs6 {
 			prefix, ok := DeriveIPv6Prefix(addr, cfg.IPv6PrefixLen)
 			if !ok {
 				continue
 			}
+			usable++
 			if _, seen := ipv6Seen[prefix]; !seen {
 				ipv6Seen[prefix] = struct{}{}
 				result.IPv6 = append(result.IPv6, prefix)
 			}
+		}
+		if usable == 0 {
+			return RefreshResult{}, fmt.Errorf("resolve %s: no usable A or AAAA records", host)
 		}
 	}
 
@@ -206,16 +240,126 @@ func Resolve(ctx context.Context, cfg Config, resolver Resolver) (RefreshResult,
 	return result, nil
 }
 
-func StatusOf(ctx context.Context, cfg Config, resolver Resolver, runtime RuntimeSet) Status {
+func StatusOf(ctx context.Context, cfg Config, resolver Resolver, runtime RuntimeSet, metadataPath ...string) Status {
 	ensureDefaults(&cfg)
 	status := Status{Enabled: cfg.Enabled, Hosts: append([]string(nil), cfg.Hosts...), IPv6PrefixLen: cfg.IPv6PrefixLen}
 	if cfg.Enabled && resolver != nil && len(cfg.Hosts) > 0 {
-		status.Configured, _ = Resolve(ctx, cfg, resolver)
+		status.Configured, status.ResolutionError = Resolve(ctx, cfg, resolver)
 	}
 	if runtime != nil {
 		status.Runtime, status.RuntimeError = runtime.List(ctx)
 	}
+	path := MetadataPath
+	if len(metadataPath) > 0 && metadataPath[0] != "" {
+		path = metadataPath[0]
+	}
+	status.Metadata, status.MetadataError = LoadMetadata(path)
+	if status.MetadataError == nil && !status.Metadata.ExpiresAt.IsZero() {
+		status.Stale = !time.Now().Before(status.Metadata.ExpiresAt)
+	}
 	return status
+}
+
+func RecordAttempt(path string, previous Metadata, result RefreshResult, ttl time.Duration, refreshErr error, now time.Time) (Metadata, error) {
+	previous.Attempts++
+	previous.LastAttempt = now.UTC()
+	if refreshErr != nil {
+		previous.ErrorCode = errorCode(refreshErr)
+		previous.ErrorSummary = refreshErr.Error()
+	} else {
+		previous.LastSuccess = now.UTC()
+		previous.ErrorCode, previous.ErrorSummary = "", ""
+		previous.IPv4Count, previous.IPv6Count = len(result.IPv4), len(result.IPv6)
+		previous.ContentHash = resultHash(result)
+		previous.ExpiresAt = now.UTC().Add(ttl)
+	}
+	return previous, SaveMetadata(path, previous)
+}
+
+func LoadMetadata(path string) (Metadata, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return Metadata{}, err
+	}
+	var metadata Metadata
+	if err := json.Unmarshal(data, &metadata); err != nil {
+		return Metadata{}, err
+	}
+	return metadata, nil
+}
+
+func SaveMetadata(path string, metadata Metadata) error {
+	data, err := json.MarshalIndent(metadata, "", "  ")
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	f, err := os.CreateTemp(dir, ".ddns-runtime-*")
+	if err != nil {
+		return err
+	}
+	tmp := f.Name()
+	defer os.Remove(tmp)
+	if _, err = f.Write(data); err == nil {
+		err = f.Chmod(0o600)
+	}
+	if err == nil {
+		err = f.Sync()
+	}
+	if closeErr := f.Close(); err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		return err
+	}
+	if err = os.Rename(tmp, path); err != nil {
+		return err
+	}
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+	return d.Sync()
+}
+
+func isAuthoritativeNoData(err error) bool {
+	var dnsErr *net.DNSError
+	return errors.As(err, &dnsErr) && dnsErr.IsNotFound && !dnsErr.IsTimeout && !dnsErr.IsTemporary
+}
+
+func errorCode(err error) string {
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) {
+		if dnsErr.IsTimeout {
+			return "dns_timeout"
+		}
+		if dnsErr.IsTemporary {
+			return "dns_temporary"
+		}
+		if dnsErr.IsNotFound {
+			return "dns_not_found"
+		}
+		return "dns_error"
+	}
+	return "refresh_error"
+}
+
+func resultHash(result RefreshResult) string {
+	var values []string
+	for _, addr := range result.IPv4 {
+		values = append(values, "4:"+addr.String())
+	}
+	for _, prefix := range result.IPv6 {
+		values = append(values, "6:"+prefix.String())
+	}
+	sort.Strings(values)
+	sum := sha256.Sum256([]byte(strings.Join(values, "\n")))
+	return hex.EncodeToString(sum[:])
 }
 
 func DeriveIPv6Prefix(addr netip.Addr, prefixLen int) (netip.Prefix, bool) {

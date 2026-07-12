@@ -1,15 +1,18 @@
 package config
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
 	"net/netip"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"gopkg.in/yaml.v3"
 )
@@ -50,8 +53,13 @@ type RateLimit struct {
 }
 
 type IPWhitelist struct {
-	IPv4 []string `json:"ipv4" yaml:"ipv4"`
-	IPv6 []string `json:"ipv6" yaml:"ipv6"`
+	IPv4 []WhitelistEntry `json:"ipv4" yaml:"ipv4"`
+	IPv6 []WhitelistEntry `json:"ipv6" yaml:"ipv6"`
+}
+
+type WhitelistEntry struct {
+	Value   string `json:"value" yaml:"value"`
+	Comment string `json:"comment,omitempty" yaml:"comment,omitempty"`
 }
 
 type DDNSWhitelist struct {
@@ -69,9 +77,8 @@ type TrustedInterfaces struct {
 }
 
 type Docker struct {
-	Enabled                      bool     `json:"enabled" yaml:"enabled"`
-	AllowPublishedPortsByDefault bool     `json:"allow_published_ports_by_default" yaml:"allow_published_ports_by_default"`
-	Interfaces                   []string `json:"interfaces" yaml:"interfaces"`
+	Enabled    bool     `json:"enabled" yaml:"enabled"`
+	Interfaces []string `json:"interfaces" yaml:"interfaces"`
 }
 
 type Duration struct {
@@ -86,8 +93,8 @@ func Default() Config {
 			Mode:      "open",
 			RateLimit: nil,
 			StaticWhitelist: IPWhitelist{
-				IPv4: []string{},
-				IPv6: []string{},
+				IPv4: []WhitelistEntry{},
+				IPv6: []WhitelistEntry{},
 			},
 			DDNSWhitelist: DDNSWhitelist{
 				Enabled:         false,
@@ -103,9 +110,8 @@ func Default() Config {
 			TrustForwarding: false,
 		},
 		Docker: Docker{
-			Enabled:                      false,
-			AllowPublishedPortsByDefault: false,
-			Interfaces:                   []string{"docker0", "br-*"},
+			Enabled:    false,
+			Interfaces: []string{"docker0", "br-*"},
 		},
 	}
 }
@@ -117,6 +123,7 @@ func Load(r io.Reader) (Config, error) {
 	if err := dec.Decode(&cfg); err != nil {
 		return Config{}, err
 	}
+	cfg.canonicalize()
 	if err := cfg.Validate(); err != nil {
 		return Config{}, err
 	}
@@ -133,6 +140,7 @@ func LoadFile(path string) (Config, error) {
 }
 
 func Save(w io.Writer, cfg Config) error {
+	cfg.canonicalize()
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
@@ -145,15 +153,41 @@ func Save(w io.Writer, cfg Config) error {
 }
 
 func SaveFile(path string, cfg Config, perm os.FileMode) error {
-	if err := cfg.Validate(); err != nil {
+	var data bytes.Buffer
+	if err := Save(&data, cfg); err != nil {
 		return err
 	}
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(dir, ".config-*")
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	return Save(f, cfg)
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath)
+	if _, err = tmp.Write(data.Bytes()); err == nil {
+		err = tmp.Chmod(perm)
+	}
+	if err == nil {
+		err = tmp.Sync()
+	}
+	if closeErr := tmp.Close(); err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		return err
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		return err
+	}
+	parent, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer parent.Close()
+	return parent.Sync()
 }
 
 func (c Config) Validate() error {
@@ -179,7 +213,11 @@ func (c Config) Validate() error {
 				errs.add(path+".end_port", "must be greater than or equal to port")
 			}
 		}
+		if hasControl(p.Comment) {
+			errs.add(path+".comment", "must not contain control characters")
+		}
 	}
+	validateOpenPortDuplicates(c.OpenPorts, &errs)
 	validateSSH(c.SSH, &errs)
 	validateTrusted(c.TrustedInterfaces, &errs)
 	validateDocker(c.Docker, &errs)
@@ -204,9 +242,9 @@ func (c Config) RiskExplanations() []string {
 	if c.SSH.Mode == "whitelist-rate-limit" {
 		risks = append(risks, "SSH hardening mode whitelist-rate-limit can still lock you out if whitelist or rate-limit settings are wrong")
 	}
-	for _, entry := range append(append([]string{}, c.SSH.StaticWhitelist.IPv4...), c.SSH.StaticWhitelist.IPv6...) {
-		if isBroadPrefix(entry) {
-			risks = append(risks, fmt.Sprintf("broad SSH static whitelist prefix %s grants access to many source addresses", entry))
+	for _, entry := range append(append([]WhitelistEntry{}, c.SSH.StaticWhitelist.IPv4...), c.SSH.StaticWhitelist.IPv6...) {
+		if isBroadPrefix(entry.Value) {
+			risks = append(risks, fmt.Sprintf("broad SSH static whitelist prefix %s grants access to many source addresses", entry.Value))
 		}
 	}
 	if c.SSH.DDNSWhitelist.Enabled {
@@ -220,9 +258,6 @@ func (c Config) RiskExplanations() []string {
 	}
 	if c.Docker.Enabled {
 		risks = append(risks, "Docker integration exposes Docker-published services from WAN when their protocol and port are listed in open_ports")
-	}
-	if c.Docker.AllowPublishedPortsByDefault {
-		risks = append(risks, "allow_published_ports_by_default can expose Docker-published services without matching open_ports entries")
 	}
 	sort.Strings(risks)
 	return risks
@@ -262,9 +297,18 @@ func validateSSH(ssh SSH, errs *ValidationErrors) {
 		if ssh.RateLimit.Connections <= 0 {
 			errs.add("ssh.rate_limit.connections", "must be greater than zero")
 		}
-		if ssh.RateLimit.Per.Duration <= 0 {
-			errs.add("ssh.rate_limit.per", "must be greater than zero")
+		if per := ssh.RateLimit.Per.Duration; per != time.Second && per != time.Minute && per != time.Hour {
+			errs.add("ssh.rate_limit.per", "must be exactly 1s, 1m, or 1h")
 		}
+	}
+	if ssh.Mode == "whitelist-rate-limit" && ssh.RateLimit == nil {
+		errs.add("ssh.rate_limit", "is required for whitelist-rate-limit mode")
+	}
+	if ssh.Mode != "whitelist-rate-limit" && ssh.RateLimit != nil {
+		errs.add("ssh.rate_limit", "is only valid for whitelist-rate-limit mode")
+	}
+	if ssh.Mode != "open" && len(ssh.StaticWhitelist.IPv4)+len(ssh.StaticWhitelist.IPv6) == 0 && !(ssh.DDNSWhitelist.Enabled && len(ssh.DDNSWhitelist.Hosts) > 0) {
+		errs.add("ssh.mode", "hardened SSH requires an effective static or enabled DDNS whitelist")
 	}
 	validateIPList("ssh.static_whitelist.ipv4", ssh.StaticWhitelist.IPv4, false, errs)
 	validateIPList("ssh.static_whitelist.ipv6", ssh.StaticWhitelist.IPv6, true, errs)
@@ -272,6 +316,10 @@ func validateSSH(ssh SSH, errs *ValidationErrors) {
 		if !isHostname(host) {
 			errs.add(fmt.Sprintf("ssh.ddns_whitelist.hosts[%d]", i), "must be a valid hostname")
 		}
+	}
+	validateStringDuplicates("ssh.ddns_whitelist.hosts", ssh.DDNSWhitelist.Hosts, strings.ToLower, errs)
+	if ssh.DDNSWhitelist.Enabled && len(ssh.DDNSWhitelist.Hosts) == 0 {
+		errs.add("ssh.ddns_whitelist.hosts", "must not be empty when DDNS whitelist is enabled")
 	}
 	if ssh.DDNSWhitelist.TTL.Duration <= 0 {
 		errs.add("ssh.ddns_whitelist.ttl", "must be greater than zero")
@@ -290,6 +338,13 @@ func validateTrusted(t TrustedInterfaces, errs *ValidationErrors) {
 			errs.add(fmt.Sprintf("trusted_interfaces.interfaces[%d]", i), "must be a valid Linux interface name")
 		}
 	}
+	validateStringDuplicates("trusted_interfaces.interfaces", t.Interfaces, func(s string) string { return s }, errs)
+	if t.Enabled && len(t.Interfaces) == 0 {
+		errs.add("trusted_interfaces.interfaces", "must not be empty when trusted interfaces are enabled")
+	}
+	if t.TrustForwarding && !t.Enabled {
+		errs.add("trusted_interfaces.trust_forwarding", "requires trusted interfaces to be enabled")
+	}
 }
 
 func validateDocker(d Docker, errs *ValidationErrors) {
@@ -298,11 +353,16 @@ func validateDocker(d Docker, errs *ValidationErrors) {
 			errs.add(fmt.Sprintf("docker.interfaces[%d]", i), "must be a valid interface name or trailing-* wildcard pattern")
 		}
 	}
+	validateStringDuplicates("docker.interfaces", d.Interfaces, func(s string) string { return s }, errs)
+	if d.Enabled && len(d.Interfaces) == 0 {
+		errs.add("docker.interfaces", "must not be empty when Docker integration is enabled")
+	}
 }
 
-func validateIPList(field string, entries []string, wantIPv6 bool, errs *ValidationErrors) {
+func validateIPList(field string, entries []WhitelistEntry, wantIPv6 bool, errs *ValidationErrors) {
+	seen := map[string]int{}
 	for i, entry := range entries {
-		addr, prefix, isPrefix, err := parseAddrOrPrefix(entry)
+		addr, prefix, isPrefix, err := parseAddrOrPrefix(entry.Value)
 		if err != nil {
 			errs.add(fmt.Sprintf("%s[%d]", field, i), "must be a valid IP address or CIDR prefix")
 			continue
@@ -314,7 +374,80 @@ func validateIPList(field string, entries []string, wantIPv6 bool, errs *Validat
 		if wantIPv6 != is6 {
 			errs.add(fmt.Sprintf("%s[%d]", field, i), "must match the whitelist IP family")
 		}
+		if hasControl(entry.Comment) {
+			errs.add(fmt.Sprintf("%s[%d].comment", field, i), "must not contain control characters")
+		}
+		canonical := addr.String()
+		if isPrefix {
+			canonical = prefix.Masked().String()
+		}
+		if first, ok := seen[canonical]; ok {
+			errs.add(fmt.Sprintf("%s[%d].value", field, i), fmt.Sprintf("duplicates %s[%d]", field, first))
+		} else {
+			seen[canonical] = i
+		}
 	}
+}
+
+func validateOpenPortDuplicates(entries []OpenPort, errs *ValidationErrors) {
+	seen := map[string]int{}
+	for i, entry := range entries {
+		end := entry.EndPort
+		if end == 0 {
+			end = entry.Port
+		}
+		key := fmt.Sprintf("%s/%d/%d", strings.ToLower(entry.Protocol), entry.Port, end)
+		if first, ok := seen[key]; ok {
+			errs.add(fmt.Sprintf("open_ports[%d]", i), fmt.Sprintf("duplicates open_ports[%d]", first))
+		} else {
+			seen[key] = i
+		}
+	}
+}
+
+func validateStringDuplicates(field string, values []string, canonical func(string) string, errs *ValidationErrors) {
+	seen := map[string]int{}
+	for i, value := range values {
+		key := canonical(value)
+		if first, ok := seen[key]; ok {
+			errs.add(fmt.Sprintf("%s[%d]", field, i), fmt.Sprintf("duplicates %s[%d]", field, first))
+		} else {
+			seen[key] = i
+		}
+	}
+}
+
+func (c *Config) canonicalize() {
+	for i := range c.OpenPorts {
+		c.OpenPorts[i].Protocol = strings.ToLower(c.OpenPorts[i].Protocol)
+		c.OpenPorts[i].Comment = strings.TrimSpace(c.OpenPorts[i].Comment)
+	}
+	canonicalizeWhitelist := func(entries []WhitelistEntry) {
+		for i := range entries {
+			entries[i].Value = canonicalIP(entries[i].Value)
+			entries[i].Comment = strings.TrimSpace(entries[i].Comment)
+		}
+	}
+	canonicalizeWhitelist(c.SSH.StaticWhitelist.IPv4)
+	canonicalizeWhitelist(c.SSH.StaticWhitelist.IPv6)
+	for i := range c.SSH.DDNSWhitelist.Hosts {
+		c.SSH.DDNSWhitelist.Hosts[i] = strings.ToLower(strings.TrimSuffix(c.SSH.DDNSWhitelist.Hosts[i], "."))
+	}
+}
+
+func canonicalIP(value string) string {
+	addr, prefix, isPrefix, err := parseAddrOrPrefix(value)
+	if err != nil {
+		return value
+	}
+	if isPrefix {
+		return prefix.Masked().String()
+	}
+	return addr.String()
+}
+
+func hasControl(value string) bool {
+	return strings.IndexFunc(value, unicode.IsControl) >= 0
 }
 
 func parseAddrOrPrefix(s string) (netip.Addr, netip.Prefix, bool, error) {

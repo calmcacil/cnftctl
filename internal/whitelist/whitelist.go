@@ -6,6 +6,7 @@ import (
 	"net/netip"
 	"sort"
 	"strings"
+	"unicode"
 )
 
 const WarningBroadPrefix = "broad_ssh_whitelist_prefix"
@@ -98,20 +99,24 @@ func ParseEntry(value, comment string) (Entry, error) {
 	if strings.ContainsAny(value, " \t\r\n") {
 		return Entry{}, fmt.Errorf("invalid whitelist entry %q", value)
 	}
+	comment = strings.TrimSpace(comment)
+	if strings.IndexFunc(comment, unicode.IsControl) >= 0 {
+		return Entry{}, errors.New("comment must not contain control characters")
+	}
 
 	if strings.Contains(value, "/") {
 		prefix, err := netip.ParsePrefix(value)
 		if err != nil {
 			return Entry{}, fmt.Errorf("invalid IP prefix %q: hostnames are not allowed in the static SSH whitelist", value)
 		}
-		return Entry{Prefix: prefix.Masked(), Comment: strings.TrimSpace(comment)}, nil
+		return Entry{Prefix: prefix.Masked(), Comment: comment}, nil
 	}
 
 	addr, err := netip.ParseAddr(value)
 	if err != nil {
 		return Entry{}, fmt.Errorf("invalid IP address %q: hostnames belong in DDNS whitelist commands", value)
 	}
-	return Entry{Prefix: netip.PrefixFrom(addr, addr.BitLen()), Comment: strings.TrimSpace(comment)}, nil
+	return Entry{Prefix: netip.PrefixFrom(addr, addr.BitLen()), Comment: comment}, nil
 }
 
 func broadWarnings(entry Entry) []Warning {

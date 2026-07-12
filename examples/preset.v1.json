@@ -1,21 +1,21 @@
 {
   "version": 1,
   "wan_interface": "eth0",
-  "open_ports": [
-    {
-      "protocol": "tcp",
-      "port": 443,
-      "comment": "HTTPS reverse proxy"
-    }
-  ],
+  "open_ports": [],
   "ssh": {
     "mode": "open",
     "static_whitelist": {
       "ipv4": [
-        "203.0.113.10"
+        {
+          "value": "203.0.113.10",
+          "comment": "example administrator"
+        }
       ],
       "ipv6": [
-        "2001:db8::10"
+        {
+          "value": "2001:db8::10",
+          "comment": "example IPv6 administrator"
+        }
       ]
     },
     "ddns_whitelist": {
@@ -37,7 +37,6 @@
   },
   "docker": {
     "enabled": false,
-    "allow_published_ports_by_default": false,
     "interfaces": [
       "docker0",
       "br-*"

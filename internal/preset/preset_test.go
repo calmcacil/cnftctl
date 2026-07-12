@@ -95,3 +95,25 @@ func TestExplainIncludesRiskWarnings(t *testing.T) {
 		}
 	}
 }
+
+func FuzzPresetJSONAndBase64(f *testing.F) {
+	valid, err := os.ReadFile("testdata/valid.json")
+	if err != nil {
+		f.Fatal(err)
+	}
+	f.Add(valid)
+	f.Add([]byte(`{"version":1}`))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		if p, err := DecodeJSON(data); err == nil {
+			encoded, err := Encode(p)
+			if err != nil {
+				t.Fatalf("encode decoded preset: %v", err)
+			}
+			if _, err := DecodeString(encoded); err != nil {
+				t.Fatalf("decode encoded preset: %v", err)
+			}
+		}
+		encoded := base64.RawURLEncoding.EncodeToString(data)
+		_, _ = DecodeString(encoded)
+	})
+}

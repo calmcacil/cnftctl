@@ -11,11 +11,12 @@ ssh:
         per: 1m0s
     static_whitelist:
         ipv4:
-            - 198.51.100.10
-            - 203.0.113.0/24
+            - value: 198.51.100.10
+              comment: home
+            - value: 203.0.113.0/24
         ipv6:
-            - 2001:db8::10
-            - 2001:db8:abcd::/56
+            - value: 2001:db8::10
+            - value: 2001:db8:abcd::/56
     ddns_whitelist:
         enabled: true
         hosts:
@@ -30,7 +31,6 @@ trusted_interfaces:
     trust_forwarding: false
 docker:
     enabled: true
-    allow_published_ports_by_default: false
     interfaces:
         - docker0
         - br-*

@@ -77,7 +77,7 @@ func (p Preset) Explain() []string {
 	lines = append(lines, fmt.Sprintf("static SSH whitelist entries: %d IPv4, %d IPv6", len(cfg.SSH.StaticWhitelist.IPv4), len(cfg.SSH.StaticWhitelist.IPv6)))
 	lines = append(lines, fmt.Sprintf("DDNS whitelist: enabled=%t hosts=%d ttl=%s refresh_interval=%s ipv6_prefix_len=%d", cfg.SSH.DDNSWhitelist.Enabled, len(cfg.SSH.DDNSWhitelist.Hosts), cfg.SSH.DDNSWhitelist.TTL, cfg.SSH.DDNSWhitelist.RefreshInterval, cfg.SSH.DDNSWhitelist.IPv6PrefixLen))
 	lines = append(lines, fmt.Sprintf("trusted interfaces: enabled=%t interfaces=%d trust_forwarding=%t", cfg.TrustedInterfaces.Enabled, len(cfg.TrustedInterfaces.Interfaces), cfg.TrustedInterfaces.TrustForwarding))
-	lines = append(lines, fmt.Sprintf("Docker integration: enabled=%t allow_published_ports_by_default=%t", cfg.Docker.Enabled, cfg.Docker.AllowPublishedPortsByDefault))
+	lines = append(lines, fmt.Sprintf("Docker integration: enabled=%t", cfg.Docker.Enabled))
 	risks := cfg.RiskExplanations()
 	if len(risks) == 0 {
 		lines = append(lines, "risk warnings: none")

@@ -32,3 +32,9 @@ func TestAddRemoveAreIdempotent(t *testing.T) {
 		t.Fatalf("expected remove change, result=%#v err=%v config=%#v", res, err, cfg)
 	}
 }
+
+func TestRejectCommentControlCharacters(t *testing.T) {
+	if _, err := Add(&Config{}, "203.0.113.10", "unsafe\ncomment"); err == nil {
+		t.Fatal("expected control character rejection")
+	}
+}

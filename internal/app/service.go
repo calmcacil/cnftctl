@@ -16,9 +16,10 @@ type IO struct {
 // CommandRequest is the shared, minimal contract between CLI wiring and the
 // packages that will later implement config, render, apply, and feature logic.
 type CommandRequest struct {
-	Command string
-	Args    []string
-	Flags   map[string][]string
+	Command     string
+	Args        []string
+	Flags       map[string][]string
+	Environment map[string]string
 }
 
 func (r CommandRequest) Flag(name string) string {

@@ -1,5 +1,7 @@
 #!/bin/sh
 #
+# WARNING: UNSUPPORTED REFERENCE ONLY. This EdgeRouter example is not part of
+# the cnftctl Debian 13 amd64 deployment architecture. Do not use it unchanged.
 # Cloudflare DDNS updater for EdgeOS / EdgeRouter.
 #
 # Updates:

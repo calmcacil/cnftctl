@@ -2,35 +2,100 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
   push:
-    branches: [main]
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   test:
-    name: Go checks
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - name: Setup Go
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
         with:
           go-version-file: go.mod
           cache: true
 
-      - name: Check formatting, tests, and vet
+      - name: Run checks
         run: sh ./scripts/check.sh
 
-      - name: Build cnftctl
+      - name: Build CLI
         run: go build -o ./bin/cnftctl ./cmd/cnftctl
+
+      - name: Race tests
+        run: go test -race ./...
+
+  analysis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Setup Go
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Install pinned analyzers
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+          go install honnef.co/go/tools/cmd/staticcheck@2025.1.1
+      - name: Vulnerability scan
+        run: govulncheck ./...
+      - name: Static analysis
+        # Style-only conversions and intentionally dormant code are reviewed separately.
+        run: staticcheck -checks=all,-S1016,-ST1000,-U1000 ./...
+
+  delivery-assets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Setup Go
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Install shell and workflow linters
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes shellcheck
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+      - name: Validate workflows and shell
+        run: |
+          actionlint .github/workflows/*.yml .github/workflows-disabled/*.yml
+          shellcheck scripts/*.sh packaging/*.sh packaging/bundle/*.sh packaging/bundle/scripts/*
+      - name: Verify systemd and delivery assets
+        run: sh ./scripts/verify-delivery-assets.sh
+      - name: Build and verify bundle
+        run: sh ./scripts/build-bundle.sh 0.0.0-ci "$RUNNER_TEMP/cnftctl-bundle"
+
+  nft-syntax:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container: debian:trixie-20250630-slim
+    steps:
+      - name: Install runner dependencies
+        run: apt-get update && apt-get install --yes ca-certificates git nftables
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Setup Go
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Validate staged nftables syntax
+        run: sh ./scripts/validate-staged.sh

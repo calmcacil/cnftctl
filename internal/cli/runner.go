@@ -66,6 +66,9 @@ func (r *Runner) Run(args []string) int {
 		if errors.Is(err, errHelp) {
 			return 0
 		}
+		if app.IsHealthError(err) {
+			return 1
+		}
 		fmt.Fprintf(r.stderr, "cnftctl: %v\n", err)
 		return 2
 	}
@@ -96,6 +99,10 @@ func (r *Runner) run(ctx context.Context, args []string) error {
 		Command: match.command.HandlerName,
 		Args:    match.positionals,
 		Flags:   match.flags,
+		Environment: map[string]string{
+			"SSH_CONNECTION": os.Getenv("SSH_CONNECTION"),
+			"SSH_CLIENT":     os.Getenv("SSH_CLIENT"),
+		},
 	}
 	return r.service.Run(ctx, app.IO{Stdin: r.stdin, Stdout: r.stdout, Stderr: r.stderr}, request)
 }
@@ -125,9 +132,13 @@ func (r *Runner) parse(args []string) (parseResult, error) {
 				return result, err
 			}
 			if name == "help" {
-				result.help = true
+				result.help = value == "true"
 			} else if name == "version" {
-				result.version = true
+				result.version = value == "true"
+			}
+			spec := knownFlags[name]
+			if !spec.Repeat && len(result.flags[name]) > 0 {
+				return result, fmt.Errorf("flag --%s may not be repeated", name)
 			}
 			result.flags[name] = append(result.flags[name], value)
 			i += consumed
@@ -151,12 +162,55 @@ func (r *Runner) parse(args []string) (parseResult, error) {
 	}
 
 	if result.version {
+		if len(result.positionals) != 0 || len(result.path) != 1 {
+			return result, errors.New("--version does not accept a command or positional arguments")
+		}
 		return result, nil
+	}
+	if !result.help && len(result.command.Children) == 0 {
+		min, max := positionalArity(result.command.Args)
+		if len(result.positionals) < min || len(result.positionals) > max {
+			return result, fmt.Errorf("%s expects %d..%d positional argument(s), got %d", join(result.path, " "), min, max, len(result.positionals))
+		}
+	}
+	groups := map[string]string{}
+	for _, spec := range knownFlags {
+		if spec.Name == "" || spec.Exclusive == "" || len(result.flags[spec.Name]) == 0 {
+			continue
+		}
+		if other, ok := groups[spec.Exclusive]; ok && other != spec.Name {
+			return result, fmt.Errorf("flags --%s and --%s are mutually exclusive", other, spec.Name)
+		}
+		groups[spec.Exclusive] = spec.Name
 	}
 	if !result.help && len(result.command.Children) > 0 && len(result.positionals) > 0 {
 		return result, fmt.Errorf("unknown command %q for %s", result.positionals[0], join(result.path, " "))
 	}
+	if !result.help {
+		reporting := map[string]bool{"status": true, "doctor": true, "validate": true, "plan": true, "transactions list": true, "ddns status": true}
+		if !reporting[result.command.HandlerName] && (len(result.flags["output"]) > 0 || result.flags["detail"] != nil) {
+			return result, fmt.Errorf("--output and --detail are only supported by reporting commands")
+		}
+		if result.flags["detail"] != nil && result.flags["detail"][0] == "false" {
+			delete(result.flags, "detail")
+		}
+	}
 	return result, nil
+}
+
+func positionalArity(args string) (int, int) {
+	if strings.TrimSpace(args) == "" {
+		return 0, 0
+	}
+	min := 0
+	max := 0
+	for _, field := range strings.Fields(args) {
+		max++
+		if !strings.HasPrefix(field, "[") {
+			min++
+		}
+	}
+	return min, max
 }
 
 func collectFlags(root, current *command) map[string]flagSpec {

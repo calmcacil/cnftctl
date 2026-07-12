@@ -1,4 +1,5 @@
 [Unit]
+# UNSUPPORTED REFERENCE ONLY; not a cnftctl deployment unit.
 Description=Refresh nftables DDNS SSH whitelist periodically
 
 [Timer]

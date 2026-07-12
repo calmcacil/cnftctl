@@ -1,6 +1,9 @@
 package ports
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestOpenIsIdempotentAndWarnsForDocker(t *testing.T) {
 	cfg := &Config{DockerEnabled: true}
@@ -55,4 +58,27 @@ func TestRejectInvalidPorts(t *testing.T) {
 			t.Fatalf("expected error for %s %s", tc.proto, tc.port)
 		}
 	}
+}
+
+func TestRejectCommentControlCharacters(t *testing.T) {
+	if _, err := Open(&Config{}, "tcp", "443", "unsafe\ncomment"); err == nil {
+		t.Fatal("expected control character rejection")
+	}
+}
+
+func FuzzParseEntry(f *testing.F) {
+	f.Add("tcp", "443", "https")
+	f.Add("udp", "1-65535", "")
+	f.Fuzz(func(t *testing.T, protocol, spec, comment string) {
+		entry, err := ParseEntry(protocol, spec, comment)
+		if err != nil {
+			return
+		}
+		if entry.Start == 0 || entry.End < entry.Start || entry.End == 0 {
+			t.Fatalf("invalid accepted entry: %#v", entry)
+		}
+		if strings.ContainsAny(FormatPort(entry), " \t\r\n") {
+			t.Fatalf("unsafe formatted port: %q", FormatPort(entry))
+		}
+	})
 }

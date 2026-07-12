@@ -1,0 +1,10 @@
+[Unit]
+Description=Dead-man timer for cnftctl transaction %i
+
+[Timer]
+OnActiveSec=2min
+AccuracySec=1s
+Unit=cnftctl-rollback@%i.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,67 @@
+#!/bin/sh
+set -eu
+
+bundle=${1:-$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)}
+manifest=$bundle/manifest
+checksums=$bundle/SHA256SUMS
+tmp=${TMPDIR:-/tmp}/cnftctl-verify-$$
+trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+mkdir -m 0700 "$tmp"
+
+[ -f "$manifest" ] || { echo "missing bundle manifest" >&2; exit 1; }
+[ -f "$checksums" ] || { echo "missing SHA256SUMS" >&2; exit 1; }
+grep -qx 'format=1' "$manifest" || { echo "unsupported manifest format" >&2; exit 1; }
+grep -qx 'product=cnftctl' "$manifest" || { echo "wrong bundle product" >&2; exit 1; }
+grep -qx 'architecture=amd64' "$manifest" || { echo "unsupported bundle architecture" >&2; exit 1; }
+grep -qx 'os=debian-13' "$manifest" || { echo "unsupported bundle OS" >&2; exit 1; }
+grep -Eq '^version=[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$' "$manifest" || {
+    echo "invalid bundle version" >&2
+    exit 1
+}
+
+find "$bundle" -type l -print -quit | grep -q . && { echo "bundle contains a symlink" >&2; exit 1; }
+find "$bundle" ! -type d ! -type f -print -quit | grep -q . && { echo "bundle contains a non-regular entry" >&2; exit 1; }
+
+cat >"$tmp/expected" <<'EOF'
+LICENSE
+THIRD_PARTY_NOTICES.md
+bin/cnftctl
+docs/incident-response.md
+docs/manual-validation.md
+docs/operator-guide.md
+docs/support-matrix.md
+install.sh
+manifest
+scripts/cnftctl-recover
+scripts/inspect-transaction
+scripts/verify-bundle
+systemd/cnftctl-ddns-refresh.service
+systemd/cnftctl-ddns-refresh.timer
+systemd/cnftctl-firewall.service
+systemd/cnftctl-reconcile.service
+systemd/cnftctl-rollback@.service
+systemd/cnftctl-rollback@.timer
+uninstall.sh
+EOF
+(cd "$bundle" && find . -type f ! -name SHA256SUMS -print | sed 's|^./||' | LC_ALL=C sort) >"$tmp/actual"
+cmp -s "$tmp/expected" "$tmp/actual" || { echo "bundle file inventory mismatch" >&2; diff -u "$tmp/expected" "$tmp/actual" >&2 || true; exit 1; }
+
+awk 'length($1) != 64 || $1 !~ /^[0-9a-f]+$/ || substr($0,65,2) != "  " || NF != 2 { exit 1 } { print $2 }' "$checksums" >"$tmp/list" || { echo "invalid SHA256SUMS syntax" >&2; exit 1; }
+LC_ALL=C sort "$tmp/list" >"$tmp/sorted"
+cmp -s "$tmp/expected" "$tmp/sorted" || { echo "checksum inventory mismatch" >&2; exit 1; }
+[ "$(LC_ALL=C sort -u "$tmp/list" | wc -l)" -eq "$(wc -l <"$tmp/list")" ] || { echo "duplicate checksum entry" >&2; exit 1; }
+while IFS= read -r path; do
+    case $path in /*|*..*|*//*|'') echo "unsafe checksum path" >&2; exit 1 ;; esac
+done <"$tmp/list"
+(cd "$bundle" && sha256sum -c SHA256SUMS)
+
+if command -v stat >/dev/null 2>&1; then
+    for path in bin/cnftctl install.sh uninstall.sh scripts/cnftctl-recover scripts/inspect-transaction scripts/verify-bundle; do
+        [ "$(stat -c %a "$bundle/$path")" = 755 ] || { echo "wrong executable mode: $path" >&2; exit 1; }
+    done
+    while IFS= read -r path; do
+        case $path in bin/cnftctl|install.sh|uninstall.sh|scripts/cnftctl-recover|scripts/inspect-transaction|scripts/verify-bundle) continue ;; esac
+        [ "$(stat -c %a "$bundle/$path")" = 644 ] || { echo "wrong data-file mode: $path" >&2; exit 1; }
+    done <"$tmp/expected"
+    [ "$(stat -c %a "$checksums")" = 644 ] || { echo "wrong checksum mode" >&2; exit 1; }
+fi

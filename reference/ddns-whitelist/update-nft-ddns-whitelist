@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# WARNING: UNSUPPORTED REFERENCE ONLY. Do not execute or install this script as
+# part of a cnftctl deployment; use only a verified canonical release bundle.
 # Resolve configured DDNS hostnames and add their A/AAAA records to nftables
 # runtime SSH whitelist sets.
 #

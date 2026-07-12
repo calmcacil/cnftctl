@@ -1,166 +1,111 @@
 # cnftctl
 
-`cnftctl` is the Go-based control tool for a specific nftables firewall profile used on Linux hosts. It is not a general-purpose firewall manager. The first release is intended to make the existing sanitized reference firewall repeatable, reviewable, and safer to operate with explicit validation and dead-man rollback expectations.
+> Production status: **NOT READY** pending exact Debian 13 amd64 artifact validation. See `docs/production-readiness.md` for remaining work and `docs/validation-record.md` for the required evidence record.
 
-The baseline behavior comes from `reference/`: default-deny host input, public WAN ports managed through one `open_ports` set, optional Docker WAN gating, optional DDNS SSH allowlists, and no use of `flush ruleset`.
+`cnftctl` manages one application-owned nftables profile, `inet hostfw`, on Debian 13 amd64 hosts. It is not a general firewall manager. It keeps operator-edited desired configuration separate from immutable active generations and never uses `flush ruleset`, so unrelated nftables owners such as Docker can coexist.
 
-## Status
+## Support
 
-This repository now has a Go module for `github.com/calmcacil/cnftctl` and first-release scaffolding. Some command-package implementation may still be in progress; use `go test ./...` as the source of truth for the current code state.
+The supported production target is exactly:
 
-Current release surface:
+- Debian 13 (`trixie`), `amd64`.
+- systemd and nftables from Debian 13.
+- Root for installation and active-policy operations.
+- Docker only when its strict WAN gate is explicitly enabled.
 
-- `reference/` remains the known-good sanitized deployment package and behavior reference.
-- `SPEC.md` records the intended CLI behavior and security model.
-- `docs/` contains operator-facing first-release notes and a manual validation checklist.
-- `examples/` contains sanitized config and preset examples.
-- `.github/workflows/` contains active CI; disabled future release scaffolding is kept outside active workflows under `.github/workflows-disabled/`.
+Other distributions, releases, architectures, init systems, and nftables versions are untested and reported as unsupported. See `docs/support-matrix.md`.
 
-## Safety Warning
+**Production status: NOT READY.** This repository documents the approved architecture contract, but no release is production-ready until the canonical Debian 13 amd64 artifact has the complete exact-artifact evidence required by `docs/manual-validation.md` and `docs/release-process.md`. Do not interpret implemented code or this documentation as evidence that those checks passed.
 
-Firewall changes can lock you out of a remote host. Do not apply this firewall over SSH unless you have an out-of-band recovery path such as console access, rescue mode, IPMI, a cloud serial console, or a tested rollback path.
+## Safety
 
-The planned active-policy flow for `cnftctl apply` is:
+Firewall changes can terminate remote access. Before the first apply, arrange console, rescue, IPMI, or cloud serial-console access.
 
-- Validate generated nftables before loading.
-- Write managed files atomically.
-- Load the managed firewall policy.
-- Start a rollback/dead-man timer, defaulting to 120 seconds.
-- Require `cnftctl confirm` before the timer expires.
-- Restore the previous known-good files/rules if confirmation does not happen.
+Every non-dry-run `apply`:
 
-Until that flow is implemented and verified end-to-end, treat `reference/` deployment as manual firewall work and use your own dead-man rollback procedure.
+1. Validates the exact final generation with `nft -c`.
+2. Writes a content-addressed immutable generation under `/var/lib/cnftctl/generations/`.
+3. Arms and verifies a pre-installed 120-second systemd rollback timer.
+4. Atomically selects the generation and restarts `cnftctl-firewall.service`.
+5. Requires `cnftctl confirm TRANSACTION_ID` before the deadline.
 
-## Requirements
+An expired first-install transaction deletes only `inet hostfw`. A later expired transaction restores the prior generation. The timer is independent of the invoking shell, and `cnftctl-reconcile.service` rolls back unconfirmed durable transactions after reboot. There is no supported rollback bypass and the timeout is fixed at 120 seconds.
 
-Runtime requirements for a managed host:
+## Install A Release Bundle
 
-- Linux with nftables.
-- Root privileges for install, apply, service management, and nftables loads.
-- `nft` for validation and loading.
-- `systemd`/`systemctl` for the DDNS whitelist timer if that feature is enabled.
-- Docker only when Docker WAN gating is enabled.
-
-Development requirements:
-
-- Go 1.22 or newer matching `go.mod`.
-
-## Build And Test
-
-Run local checks from the repository root:
+Use the complete release bundle, not a binary copied by itself. The bundle contains the binary, systemd units, manifest, checksums, installer, and uninstaller.
 
 ```sh
-go test ./...
-go vet ./...
-test -z "$(gofmt -l .)"
+tar -xf cnftctl-VERSION-debian13-amd64.tar.gz
+cd cnftctl-VERSION-debian13-amd64
+./scripts/verify-bundle .
+sudo ./install.sh
 ```
 
-Build the CLI with:
+The installer contract verifies bundle checksums and the Debian 13 amd64 platform, installs `/usr/bin/cnftctl` and units under `/usr/lib/systemd/system`, and does not activate firewall policy. Guarded upgrade and uninstall are part of that contract. Production support remains withheld until these behaviors pass exact-artifact validation.
+
+## First Policy
 
 ```sh
+sudo cnftctl init --wan-interface eth0 --yes
+sudo cnftctl validate
+sudo cnftctl plan
+sudo cnftctl apply
+# Verify this SSH session and a second administrative path.
+sudo cnftctl confirm TRANSACTION_ID
+sudo cnftctl status
+```
+
+`init`, `open`, `close`, whitelist/DDNS edits, SSH mode changes, and feature toggles update only mutable desired operator intent in `/etc/cnftctl/config.yaml`. Desired config is not active policy and editing it does not change live nftables rules. `apply` creates and activates an immutable generation; `confirm` makes that generation survive its rollback deadline.
+
+SSH is open from WAN by default to reduce first-install lockout risk. Hardened modes require allowlist coverage. When an existing SSH session is not covered, apply fails unless the operator explicitly supplies both `--acknowledge-ssh-lockout-risk` and a non-empty `--reason`, for interactive and noninteractive use alike. The acknowledgement and reason are recorded in transaction state.
+
+## Policy Model
+
+- Default-deny host input with loopback, established/related traffic, ICMP/ICMPv6, IPv6 NDP, and Path MTU Discovery allowed.
+- Invalid TCP is dropped without a global invalid-UDP drop.
+- WAN-scoped reverse-path anti-spoofing is applied.
+- `open_ports` entries expose matching host services publicly from WAN.
+- Trusted interfaces are opt-in and fully trusted for configured input behavior.
+- Static SSH entries accept IP addresses and CIDRs; hostnames belong to DDNS.
+- DDNS A records become exact IPv4 entries. AAAA records become `/56` prefixes by default; `/64` is the only alternative and trusts one LAN prefix.
+- DDNS refresh uses runtime nftables sets with timeouts and records freshness metadata. The timer unit is installed but remains disabled until selected active-generation intent enables it; its state is reconciled after activation, rollback, and boot.
+
+## Docker
+
+Docker integration is disabled by default and is a strict WAN gate. When enabled, a Docker-published service is reachable from WAN only when its protocol and public port also appear in `open_ports`; that same entry exposes a matching host service. IPv4 DNAT uses the original destination port, while supported IPv6 DNAT/routed traffic is gated by destination port.
+
+`cnftctl docker backend plan` previews setting Docker's `firewall-backend` to `nftables`. `cnftctl docker backend write --yes` preserves other daemon JSON keys and writes a timestamped backup. It never restarts Docker. A backend migration and Docker restart are disruptive and remain an explicit operator action.
+
+## Inspection And Automation
+
+`status`, `doctor`, `validate`, `plan`, `transactions list`, and `ddns status` support `--output text|json`; `--detail` includes additional potentially sensitive values. `transactions list` reports pending transactions, not transaction history. JSON uses schema `cnftctl.report.v1` with stable check IDs, states, summaries, optional codes/details, and command-specific data.
+
+Exit codes are:
+
+| Code | Meaning |
+| --- | --- |
+| `0` | Command succeeded; an inspection is healthy or not applicable. |
+| `1` | Inspection completed and emitted usable output, but found absent, pending, degraded, failed, unknown, or unsupported state. |
+| `2` | Usage, validation, permission, I/O, or operational failure. |
+
+Use `journalctl -u cnftctl-firewall.service`, `journalctl -u cnftctl-reconcile.service`, `journalctl -u 'cnftctl-rollback@*.service'`, and `journalctl -u cnftctl-ddns-refresh.service` for service logs. See `docs/operator-guide.md` and `docs/incident-response.md`.
+
+## Development
+
+```sh
+sh ./scripts/check.sh
 go build -o ./bin/cnftctl ./cmd/cnftctl
 ```
 
-Install a locally built binary with:
-
-```sh
-sudo install -m 0755 ./bin/cnftctl /usr/local/bin/cnftctl
-```
-
-CI runs the same checks plus the CLI build on pull requests and pushes to `main`.
-
-## First-Run Flow
-
-The intended first-run CLI flow is:
-
-```sh
-cnftctl init --dry-run
-sudo cnftctl init --wan-interface eth0
-cnftctl plan
-sudo cnftctl apply
-sudo cnftctl confirm
-cnftctl status
-```
-
-Important first-run defaults and expectations:
-
-- A fresh install should open no public WAN service ports beyond the selected SSH mode.
-- SSH should remain open by default to reduce accidental lockout risk.
-- SSH hardening to whitelist-only or whitelist-plus-rate-limit must be explicit.
-- Optional Docker gating, DDNS whitelist, and trusted overlay interfaces must be enabled intentionally.
-- `open` and `close` style commands should update config/rendered files, but active nftables policy should not change until `apply` succeeds and is confirmed.
-
-The current manual reference deployment flow is documented in `reference/README.md`.
-
-## Firewall Model
-
-The managed firewall profile is expected to preserve these behaviors:
-
-- Manage only the app-owned `inet hostfw` table.
-- Avoid `flush ruleset` so Docker-managed nftables state is not destroyed.
-- Default-deny host input.
-- Allow ICMP/ICMPv6 for diagnostics, IPv6 NDP, and Path MTU Discovery.
-- Allow loopback and established/related traffic.
-- Drop invalid TCP without globally dropping invalid UDP.
-- Apply WAN-scoped uRPF anti-spoofing.
-- Allow public WAN service ports only when listed in `open_ports`.
-- Use static and optional DDNS allowlists for SSH hardening modes.
-
-## Docker Caveats
-
-Docker integration is opt-in because it changes exposure semantics and depends on Docker's firewall backend.
-
-When Docker WAN gating is enabled:
-
-- Every entry in `open_ports` is public from WAN for matching host services and Docker-published services.
-- Docker can publish ports that remain blocked from WAN until the matching protocol/port is listed in `open_ports`.
-- Docker Engine may need the nftables firewall backend for the intended behavior.
-- Changing Docker's firewall backend can require editing `/etc/docker/daemon.json` and restarting Docker, which can disrupt running containers.
-- `cnftctl` must not restart Docker or rewrite Docker daemon configuration without explicit consent.
-
-## DDNS IPv6 Prefix Behavior
-
-The DDNS SSH whitelist treats DNS hostnames as part of the SSH trust boundary.
-
-Expected behavior:
-
-- A records become exact IPv4 whitelist entries.
-- AAAA records are converted into IPv6 prefixes.
-- The default IPv6 prefix length is `/56`, matching DHCPv6-PD setups where a router receives a delegated `/56` and assigns `/64` LANs.
-- Use `/64` only when you want to trust a single LAN prefix rather than the broader delegated prefix.
-- Dynamic entries should expire automatically if refresh stops.
-
-The reference updater implements this with `IPV6_PREFIXLEN="56"` in `reference/ddns-whitelist/update-nft-ddns-whitelist`.
-
-## Presets
-
-Presets are planned as versioned JSON payloads that can be passed as readable JSON files or base64url-encoded strings. They are intended to pre-fill configuration, not to bypass local validation or confirmation.
-
-Security rules for presets:
-
-- Treat presets as untrusted input.
-- Reject unknown schema versions.
-- Validate every port, protocol, CIDR, hostname, interface, duration, and feature flag.
-- Explain risky choices before writing files, including SSH hardening, broad allowlist prefixes, Docker integration, Docker daemon changes, public open ports, and DDNS trust.
-- Do not put Cloudflare tokens, private keys, passwords, or personal IP allowlists in presets.
-
-See `examples/config.yaml` and `examples/preset.v1.json` for sanitized examples.
+The reference files remain a sanitized behavior baseline, not the supported bundle installation path. Contribution terms are in `CONTRIBUTING.md`, vulnerability reporting is in `SECURITY.md`, and third-party attribution is in `THIRD_PARTY_NOTICES.md`.
 
 ## Documentation
 
-- `SPEC.md` - technical design and target command behavior.
-- `docs/release-notes.md` - first-release notes and release checklist.
-- `docs/manual-validation.md` - manual validation checklist for packaging and host testing.
-- `docs/release-process.md` - SemVer, Conventional Commits, and disabled release workflow policy.
-- `reference/README.md` - current sanitized manual deployment package.
-- `reference/nftables.conf` - baseline nftables ruleset.
-- `reference/nftables.d/open-ports.nft` - public WAN open-port set.
-- `reference/nftables.d/whitelist.nft` - static SSH whitelist examples.
-
-## Security Notes
-
-- Keep examples sanitized. Do not commit real tokens, real domains, private addresses, or personal allowlists.
-- Any public open port is a WAN exposure decision.
-- Any DDNS hostname is an SSH trust decision.
-- Any trusted interface is full-trust for the first-release model.
-- Review generated nftables before loading it on a remote host.
+- `SPEC.md`: implemented architecture and invariants.
+- `docs/operator-guide.md`: install, operation, logging, upgrades, uninstall, and recovery.
+- `docs/manual-validation.md`: executable validation checklist for an exact release artifact.
+- `docs/support-matrix.md`: supported and unsupported environments.
+- `docs/incident-response.md`: lockout, rollback, boot, DDNS, and Docker runbooks.
+- `docs/release-process.md`: release evidence and publication procedure.
+- `docs/release-notes.md`: release evidence template and limitations.

@@ -5,24 +5,24 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 )
 
-// Runner executes external commands. Tests can replace it with a fake so no
-// root privileges or live nftables installation is needed.
 type Runner interface {
-	Run(ctx context.Context, name string, args ...string) Result
+	Run(context.Context, string, ...string) Result
 }
-
 type Result struct {
-	Stdout string
-	Stderr string
-	Err    error
+	Stdout, Stderr string
+	Err            error
+}
+type SetReplacement struct {
+	Set      string
+	Elements []string
 }
 
 func (r Result) OK() bool { return r.Err == nil }
-
 func (r Result) Error() error {
 	if r.Err == nil {
 		return nil
@@ -37,21 +37,18 @@ type ExecRunner struct{}
 
 func (ExecRunner) Run(ctx context.Context, name string, args ...string) Result {
 	cmd := exec.CommandContext(ctx, name, args...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
+	var out, stderr bytes.Buffer
+	cmd.Stdout = &out
 	cmd.Stderr = &stderr
 	err := cmd.Run()
-	return Result{Stdout: stdout.String(), Stderr: stderr.String(), Err: err}
+	return Result{Stdout: out.String(), Stderr: stderr.String(), Err: err}
 }
 
-func CheckDependencies(ctx context.Context, runner Runner, names ...string) error {
+func CheckDependencies(ctx context.Context, r Runner, names ...string) error {
 	var missing []string
-	for _, name := range names {
-		if name == "" {
-			continue
-		}
-		if res := runner.Run(ctx, "sh", "-c", "command -v "+shellQuote(name)); !res.OK() {
-			missing = append(missing, name)
+	for _, n := range names {
+		if n != "" && !r.Run(ctx, "sh", "-c", "command -v "+shellQuote(n)).OK() {
+			missing = append(missing, n)
 		}
 	}
 	if len(missing) > 0 {
@@ -59,40 +56,117 @@ func CheckDependencies(ctx context.Context, runner Runner, names ...string) erro
 	}
 	return nil
 }
-
-func shellQuote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
+func shellQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'" }
+func ValidateFile(ctx context.Context, r Runner, path string) error {
+	return fileCommand(ctx, r, true, path)
 }
-
-func ValidateFile(ctx context.Context, runner Runner, path string) error {
+func LoadFile(ctx context.Context, r Runner, path string) error {
+	return fileCommand(ctx, r, false, path)
+}
+func fileCommand(ctx context.Context, r Runner, check bool, path string) error {
 	if path == "" {
 		return errors.New("nft config path is required")
 	}
-	res := runner.Run(ctx, "nft", "-c", "-f", path)
+	args := []string{"-f", path}
+	verb := "load"
+	if check {
+		args = []string{"-c", "-f", path}
+		verb = "validate"
+	}
+	res := r.Run(ctx, "nft", args...)
 	if !res.OK() {
-		return fmt.Errorf("validate nft config %s: %w", path, res.Error())
+		return fmt.Errorf("%s nft config %s: %w", verb, path, res.Error())
 	}
 	return nil
 }
-
-func LoadFile(ctx context.Context, runner Runner, path string) error {
-	if path == "" {
-		return errors.New("nft config path is required")
-	}
-	res := runner.Run(ctx, "nft", "-f", path)
-	if !res.OK() {
-		return fmt.Errorf("load nft config %s: %w", path, res.Error())
-	}
-	return nil
-}
-
-func HasTable(ctx context.Context, runner Runner, family, table string) (bool, error) {
+func HasTable(ctx context.Context, r Runner, family, table string) (bool, error) {
 	if family == "" || table == "" {
 		return false, errors.New("nft family and table are required")
 	}
-	res := runner.Run(ctx, "nft", "list", "table", family, table)
+	res := r.Run(ctx, "nft", "list", "table", family, table)
 	if res.OK() {
 		return true, nil
 	}
-	return false, nil
+	if isMissingTable(res.Stderr) {
+		return false, nil
+	}
+	return false, fmt.Errorf("inspect nft table %s %s: %w", family, table, res.Error())
+}
+func ListTable(ctx context.Context, r Runner, family, table string) (string, bool, error) {
+	if family == "" || table == "" {
+		return "", false, errors.New("nft family and table are required")
+	}
+	res := r.Run(ctx, "nft", "list", "table", family, table)
+	if res.OK() {
+		return res.Stdout, true, nil
+	}
+	if isMissingTable(res.Stderr) {
+		return "", false, nil
+	}
+	return "", false, fmt.Errorf("inspect nft table %s %s: %w", family, table, res.Error())
+}
+func DeleteTable(ctx context.Context, r Runner, family, table string) error {
+	if family == "" || table == "" {
+		return errors.New("nft family and table are required")
+	}
+	f, err := os.CreateTemp("", "cnftctl-delete-*.nft")
+	if err != nil {
+		return err
+	}
+	path := f.Name()
+	defer os.Remove(path)
+	if _, err = f.WriteString("delete table " + family + " " + table + "\n"); err == nil {
+		err = f.Sync()
+	}
+	if closeErr := f.Close(); err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		return err
+	}
+	return LoadFile(ctx, r, path)
+}
+
+// ReplaceSet atomically flushes and repopulates one managed set in a single nft batch.
+func ReplaceSet(ctx context.Context, r Runner, family, table, set string, elements []string) error {
+	return ReplaceSets(ctx, r, family, table, []SetReplacement{{Set: set, Elements: elements}})
+}
+
+// ReplaceSets flushes and repopulates all supplied sets in one atomic nft batch.
+func ReplaceSets(ctx context.Context, r Runner, family, table string, replacements []SetReplacement) error {
+	for _, v := range []string{family, table} {
+		if v == "" || strings.ContainsAny(v, " \t\r\n;{}") {
+			return errors.New("invalid nft set identifier")
+		}
+	}
+	var b strings.Builder
+	for _, replacement := range replacements {
+		if replacement.Set == "" || strings.ContainsAny(replacement.Set, " \t\r\n;{}") {
+			return errors.New("invalid nft set identifier")
+		}
+		fmt.Fprintf(&b, "flush set %s %s %s\n", family, table, replacement.Set)
+		if len(replacement.Elements) > 0 {
+			fmt.Fprintf(&b, "add element %s %s %s { %s }\n", family, table, replacement.Set, strings.Join(replacement.Elements, ", "))
+		}
+	}
+	f, err := os.CreateTemp("", "cnftctl-set-*.nft")
+	if err != nil {
+		return err
+	}
+	path := f.Name()
+	defer os.Remove(path)
+	if _, err = f.WriteString(b.String()); err == nil {
+		err = f.Sync()
+	}
+	if closeErr := f.Close(); err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		return err
+	}
+	return LoadFile(ctx, r, path)
+}
+func isMissingTable(s string) bool {
+	s = strings.ToLower(s)
+	return strings.Contains(s, "no such file or directory") || strings.Contains(s, "does not exist") || strings.Contains(s, "no such table")
 }

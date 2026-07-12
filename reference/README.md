@@ -1,7 +1,9 @@
 # Reference nftables Docker firewall with DDNS SSH whitelist
 
-This folder is a sanitized, reusable reference package for deploying a default-deny
-nftables firewall on Docker-capable Linux servers.
+> **DO NOT DEPLOY OR EXECUTE THIS DIRECTORY AS A PRODUCTION FIREWALL.** This is a sanitized compatibility reference for review only. It omits cnftctl's mandatory exact-generation validation, durable transactions, fixed rollback, boot reconciliation, ownership checks, and active-generation DDNS scheduling. The only intended delivery unit is the canonical `cnftctl-VERSION-debian13-amd64.tar.gz` bundle, whose production status remains **NOT READY** pending exact Debian 13 amd64 evidence.
+
+This folder is a sanitized historical behavior baseline for a default-deny nftables
+firewall. Its files are intentionally not an installation or operations guide.
 
 It contains no real domains, API tokens, or personal whitelist addresses.
 
@@ -54,7 +56,7 @@ set open_ports {
     typeof meta l4proto . th dport
     flags interval
     elements = {
-        tcp . 443,
+        # empty by default
     }
 }
 ```
@@ -168,94 +170,9 @@ sh curl ip awk logger
 
 No Python or jq is required.
 
-## Deployment
+## No Supported Manual Deployment
 
-### Server firewall files
-
-Copy:
-
-```text
-reference/nftables.conf -> /etc/nftables.conf
-reference/nftables.d/open-ports.nft -> /etc/nftables.d/open-ports.nft
-reference/nftables.d/whitelist.nft -> /etc/nftables.d/whitelist.nft
-```
-
-Customize:
-
-- `WAN_IF`
-- `VPN_IFS`
-- `DOCKER_IFS`
-- `whitelist.nft`
-- `open-ports.nft`
-
-Validate:
-
-```sh
-nft -c -f /etc/nftables.conf
-```
-
-Use a rollback/dead-man switch when applying remotely.
-
-### Server DDNS whitelist files
-
-Copy:
-
-```text
-reference/ddns-whitelist/ddns-hosts.conf -> /etc/nftables.d/ddns-hosts.conf
-reference/ddns-whitelist/update-nft-ddns-whitelist -> /usr/local/sbin/update-nft-ddns-whitelist
-reference/ddns-whitelist/nft-ddns-whitelist.service -> /etc/systemd/system/nft-ddns-whitelist.service
-reference/ddns-whitelist/nft-ddns-whitelist.timer -> /etc/systemd/system/nft-ddns-whitelist.timer
-```
-
-Install:
-
-```sh
-chmod 0755 /usr/local/sbin/update-nft-ddns-whitelist
-systemctl daemon-reload
-systemctl enable --now nft-ddns-whitelist.timer
-```
-
-Run once manually:
-
-```sh
-/usr/local/sbin/update-nft-ddns-whitelist
-```
-
-Inspect dynamic entries:
-
-```sh
-nft list set inet hostfw ddns_whitelist_v4
-nft list set inet hostfw ddns_whitelist_v6
-```
-
-### EdgeRouter Cloudflare DDNS
-
-Copy `reference/cloudflare-ddns.sh` to the EdgeRouter, for example:
-
-```text
-/config/scripts/cloudflare-ddns.sh
-```
-
-Customize:
-
-- `TOKEN`
-- `ZONE`
-- `RECORD`
-- `IPV6_IF`
-
-Make executable:
-
-```sh
-chmod 0755 /config/scripts/cloudflare-ddns.sh
-```
-
-Run manually:
-
-```sh
-/config/scripts/cloudflare-ddns.sh
-```
-
-Then schedule it using the EdgeRouter task scheduler or cron-style mechanism.
+Do not copy these files into `/etc`, enable their reference timers, or execute the updater scripts as a cnftctl deployment. They remain readable solely to compare sanitized firewall behavior. Use only a verified canonical release bundle after its exact-artifact evidence gate passes.
 
 ## Security notes
 

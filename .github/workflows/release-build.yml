@@ -65,9 +65,14 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: sh ./scripts/build-bundle.sh "$VERSION" "dist/cnftctl-$VERSION-debian13-amd64"
       - name: Generate SPDX SBOM
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
           go install github.com/anchore/syft/cmd/syft@v1.27.1
-          syft dir:dist -o spdx-json=sbom.spdx.json
+          syft "dir:dist/cnftctl-$VERSION-debian13-amd64" \
+            --source-name cnftctl \
+            --source-version "$VERSION" \
+            -o spdx-json=sbom.spdx.json
       - name: Package and checksum candidate
         env:
           VERSION: ${{ inputs.version }}

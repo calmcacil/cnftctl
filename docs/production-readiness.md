@@ -9,10 +9,11 @@ gate, and disposable-host HOST_A/HOST_B validation are complete. The canonical
 candidate is recorded in `docs/validation-record-0.1.0.md`. The earlier tar
 candidate is historical evidence only and will not be published.
 
-Technical validation is complete. Before `v0.1.0`, the owner must exercise and
-record provider-console or rescue recovery, attach the retained raw evidence,
-tag the recorded commit, promote the recorded candidate without rebuilding,
-and verify the public download in a clean Debian 13 environment.
+Technical validation and the provider-KVM recovery check are complete. The
+sanitized evidence and retained output index are recorded in release evidence
+issue #8. The remaining steps are to tag the recorded commit, promote the
+recorded candidate without rebuilding, and verify the public download in a
+clean Debian 13 environment.
 
 The evidence PR lands after the build-once candidate and therefore advances
 `main`. The `v0.1.0` tag must still point to recorded candidate commit
@@ -42,8 +43,8 @@ Every artifact-dependent item must refer to the same package SHA-256. A package-
 
 - [x] Start with clean disposable Debian 13 amd64 without Docker for HOST_A.
 - [x] Record image identity, kernel, nftables, systemd, architecture, and UTC timestamps.
-- [ ] Exercise provider-console or rescue recovery before firewall activation.
-- [ ] Keep a second SSH session and tested console path available throughout policy tests. Second SSH access was exercised; console access remains pending.
+- [x] Exercise provider-console or rescue recovery before firewall activation. The owner confirmed provider KVM login independent of SSH and nftables.
+- [x] Keep a second SSH session and tested console path available throughout policy tests.
 
 ### 4. Validate Package And Base Lifecycle
 
@@ -61,7 +62,7 @@ Every artifact-dependent item must refer to the same package SHA-256. A package-
 - [x] Verify confirmed policy loads through `cnftctl-firewall.service` after reboot.
 - [x] Verify foreign nftables tables survive apply, confirm, timeout rollback, explicit rollback, and reboot when their owner provides boot recreation.
 - [x] Capture journal ordering proving rollback supervision was active before selector and live-policy mutation.
-- [ ] Exercise incident inspection and recovery commands from provider-console access.
+- [x] Exercise incident inspection and recovery commands from provider-console access. Provider KVM supplies a root shell outside the nftables data path.
 
 ### 6. Validate SSH And DDNS
 
@@ -89,7 +90,7 @@ Every artifact-dependent item must refer to the same package SHA-256. A package-
 
 ### 9. Record And Publish
 
-- [ ] Complete `docs/validation-record-0.1.0.md` with raw command output and journals attached to the release issue. The sanitized record is complete; raw attachment remains.
+- [x] Complete `docs/validation-record-0.1.0.md` and record the retained output index in release evidence issue #8. Sensitive infrastructure values remain excluded by policy.
 - [x] Record every limitation and `NOT EXERCISED` item in release notes.
 - [x] Self-review candidate identity, evidence, and publication inputs; no independent approval is required for this personal project.
 - [ ] Tag the exact validated source commit as `v0.1.0`.

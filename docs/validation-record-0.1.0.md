@@ -1,9 +1,9 @@
 # Release Validation Record: 0.1.0 Debian Candidate
 
-This record covers the native Debian package proposed for `v0.1.0`. It is
-technical release evidence, not proof of the post-publication download check.
-The tag, promotion, and public-download checks have not run. The owner has
-confirmed provider KVM login independent of SSH and nftables.
+This record covers the native Debian package published as `v0.1.0`. The exact
+candidate was tagged, promoted without rebuilding, downloaded publicly, and
+reverified. The owner confirmed provider KVM login independent of SSH and
+nftables.
 
 HOST_A and HOST_B were consecutive phases on one disposable Debian 13 amd64
 VPS. The host was returned to an inactive state after validation: `cnftctl`
@@ -15,7 +15,7 @@ operator configuration and audit state remained preserved.
 
 | Field | Recorded Value |
 | --- | --- |
-| Version/tag | `0.1.0` candidate; tag not yet created |
+| Version/tag | `v0.1.0` |
 | Commit SHA | `ee7ab0fd6932bafe1c22b684ec72e27e50803f94` |
 | Artifact filename | `cnftctl_0.1.0_amd64.deb` |
 | Artifact byte size | `1712440` |
@@ -131,7 +131,7 @@ Transaction state and systemd journals showed this order for live applies:
 
 No secret, credential, or DDNS trust value appeared in retained journals.
 
-## Known Limitations And Remaining Gates
+## Known Limitations And Release Results
 
 | Item | Status/Rationale |
 | --- | --- |
@@ -139,8 +139,8 @@ No secret, credential, or DDNS trust value appeared in retained journals.
 | Docker IPv6 external probe | `NOT EXERCISED`; exact generated rules and nftables syntax passed; IPv4 is the qualified external path |
 | Supported Docker backend write | `NOT EXERCISED`; Debian Docker 26 rejects the directive, and writing an invalid daemon configuration would be unsafe |
 | Evidence issue | [Issue #8](https://github.com/calmcacil/cnftctl/issues/8) records candidate identity, retained output index, automated raw-log locations, KVM confirmation, and sanitization exclusions |
-| Final tag and promotion | Not run; `v0.1.0` must point to candidate commit `ee7ab0f...`, even though this evidence PR advances `main`, and promotion must use run `29282503578` without rebuilding |
-| Public download verification | Requires publication and remains outstanding |
+| Final tag and promotion | `PASS`; `v0.1.0` points to `ee7ab0f...` and promotion run `29287049593` published candidate run `29282503578` without rebuilding |
+| Public download verification | `PASS`; checksum, SBOM, strengthened attestation policy, package inventory, package-clean Debian 13 install/version/inactive-policy contract, purge, and Docker preservation passed |
 | Vulnerability exceptions | None |
 
 ## Final Decision
@@ -151,7 +151,7 @@ No secret, credential, or DDNS trust value appeared in retained journals.
 - [x] Candidate identity and evidence received a self-review; independent approval is not required.
 - [x] Provider KVM recovery has been exercised and recorded.
 - [x] Sanitized evidence and the retained output index are recorded in release evidence issue #8.
-- [ ] The exact source commit has been tagged and candidate run promoted without rebuilding.
-- [ ] Publicly downloaded release bytes have been reverified.
+- [x] The exact source commit has been tagged and candidate run promoted without rebuilding.
+- [x] Publicly downloaded release bytes have been reverified.
 
-Decision: `APPROVE FOR TAG AND PROMOTION — POST-PUBLICATION DOWNLOAD VERIFICATION REMAINS MANDATORY`
+Decision: `APPROVED AND PUBLISHED — v0.1.0 IS SUPPORTED ON THE RECORDED PLATFORM`

@@ -9,11 +9,10 @@ gate, and disposable-host HOST_A/HOST_B validation are complete. The canonical
 candidate is recorded in `docs/validation-record-0.1.0.md`. The earlier tar
 candidate is historical evidence only and will not be published.
 
-Technical validation and the provider-KVM recovery check are complete. The
-sanitized evidence and retained output index are recorded in release evidence
-issue #8. The remaining steps are to tag the recorded commit, promote the
-recorded candidate without rebuilding, and verify the public download in a
-clean Debian 13 environment.
+`v0.1.0` is published and supported. Technical validation, provider-KVM
+recovery, build-once promotion, and public-download verification are complete.
+The sanitized evidence and retained output index are recorded in release
+evidence issue #8.
 
 The evidence PR lands after the build-once candidate and therefore advances
 `main`. The `v0.1.0` tag must still point to recorded candidate commit
@@ -93,9 +92,9 @@ Every artifact-dependent item must refer to the same package SHA-256. A package-
 - [x] Complete `docs/validation-record-0.1.0.md` and record the retained output index in release evidence issue #8. Sensitive infrastructure values remain excluded by policy.
 - [x] Record every limitation and `NOT EXERCISED` item in release notes.
 - [x] Self-review candidate identity, evidence, and publication inputs; no independent approval is required for this personal project.
-- [ ] Tag the exact validated source commit as `v0.1.0`.
-- [ ] Promote the candidate package without rebuilding.
-- [ ] Download the public package in a clean Debian 13 environment and repeat checksum, provenance, package, installation, version, and removal verification.
+- [x] Tag the exact validated source commit as `v0.1.0`.
+- [x] Promote candidate run `29282503578` without rebuilding; promotion run `29287049593` passed.
+- [x] Download the public package in a package-clean Debian 13 environment and repeat checksum, provenance, package, installation, version, and removal verification.
 
 ## Stop Conditions
 

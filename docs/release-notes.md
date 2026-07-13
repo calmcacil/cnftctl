@@ -1,12 +1,14 @@
-# Release Notes And Evidence: 0.1.0 Candidate
+# Release Notes And Evidence: v0.1.0
 
 ## Identity
 
-- Version/tag: `0.1.0` candidate; `v0.1.0` is not yet created
+- Version/tag: `v0.1.0`
 - Commit: `ee7ab0fd6932bafe1c22b684ec72e27e50803f94`
 - Artifact: `cnftctl_0.1.0_amd64.deb` (`1712440` bytes)
 - Artifact SHA-256: `93966559a326522a984cc8dcd36a062d5f4931a8c51cacecdc847664b277b198`
 - CI run: [Release Candidate Build 29282503578](https://github.com/calmcacil/cnftctl/actions/runs/29282503578)
+- Promotion run: [29287049593](https://github.com/calmcacil/cnftctl/actions/runs/29287049593)
+- Release: [v0.1.0](https://github.com/calmcacil/cnftctl/releases/tag/v0.1.0)
 - Tester and UTC date: project owner/Codex, 2026-07-13
 
 ## Scope
@@ -28,7 +30,6 @@ The supported installation unit is the verified Debian package. Installation ena
 - Docker external IPv6 traffic was not exercised; generated IPv6 rules passed exact nftables syntax validation.
 - Debian Docker 26 rejects the proposed `firewall-backend` directive, so a supported backend write was not exercised and no daemon file was changed.
 - Provider KVM login was confirmed and provides a shell independent of SSH and nftables. Operators without provider console/rescue access necessarily depend on rollback completing successfully.
-- The tag, promotion, and clean public-download verification remain pending.
 
 ## Evidence
 
@@ -47,8 +48,11 @@ The supported installation unit is the verified Debian package. Installation ena
 - Security, vulnerability, license, notice, and sanitization review: `PASS`.
 - SBOM and build provenance: `PASS`; two attestations refer to the exact package digest.
 - Provider KVM recovery path: `PASS`; recorded in release evidence issue #8.
+- Build-once promotion: `PASS`; the published package is byte-identical to candidate run `29282503578`.
+- Public-download checksum, provenance, package, clean-state install/version, and removal verification: `PASS`.
 
-Detailed results and remaining gates are in `docs/validation-record-0.1.0.md`
+Detailed results and readiness status are in `docs/validation-record-0.1.0.md`
 and `docs/production-readiness.md`. Retained raw command output and journals
-are indexed in release evidence issue #8 with sensitive infrastructure values
-excluded under the repository sanitization policy.
+and final public-download results are indexed in release evidence issue #8,
+with sensitive infrastructure values excluded under the repository
+sanitization policy.

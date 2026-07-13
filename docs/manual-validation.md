@@ -6,7 +6,7 @@ The canonical archive name is `cnftctl-VERSION-debian13-amd64.tar.gz`. **Product
 
 Use `docs/production-readiness.md` as the release gate and record results in `docs/validation-record.md`. This file supplies the executable host steps; all three documents must refer to the same artifact SHA-256.
 
-Use at least two clean VMs: `HOST_A` without Docker and `HOST_B` with a disposable Docker installation. Keep an independent SSH session and console open throughout active-policy tests.
+Use two clean validation phases: `HOST_A` without Docker and `HOST_B` with a disposable Docker installation. Separate VMs are preferred; one disposable VM may be reused only after the HOST_A approved uninstall completes, preserved cnftctl state is archived and purged, absence of the managed table is verified, and Docker is installed afterward. Keep an independent SSH session and console open throughout active-policy tests.
 
 ## Artifact Identity
 

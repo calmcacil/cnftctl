@@ -18,15 +18,21 @@ Completed in the repository:
 - Apache-2.0 licensing, security policy, support policy, operator guide, and incident procedures.
 - Formatting, unit tests, race tests, vet, static analysis, vulnerability scanning, fault injection, fuzz smoke tests, bundle lifecycle tests, and workflow validation.
 
+The immutable `0.1.0` candidate at commit
+`88bbf3bb7847d82ea737a8aaa6ad73963f565b1b` was built by Release Candidate
+Build run `29257634117`. Its exact archive SHA-256 is
+`b77228ab67f19e3f484a9ce57f1fe3bd2ecfc546b4e1b888ac8e20ed4e810c0c`.
+CI, provenance, SPDX attestation, offline verification, and the sanitized
+HOST_A/HOST_B record at `docs/validation-record-0.1.0.md` are complete.
+
 Not completed as release evidence:
 
-- No final SemVer tag or immutable release commit has been selected.
-- No final canonical archive has been built through the release-candidate workflow.
-- No exact Debian 13 amd64 VM validation record exists for final archive bytes.
-- No independent reviewer has approved a completed validation record.
-- No keyless provenance, SBOM attestation, or protected promotion has been executed.
-- The release workflows are active, but the protected `release` environment and independent approver still require repository-side configuration.
-- No public release has been created and reverified after download.
+- No final SemVer tag has been created.
+- Provider-console recovery has not been exercised for this candidate.
+- Raw host output and journals have not been attached to a release issue.
+- No independent reviewer has approved the completed validation record.
+- The protected `release` environment and independent approver still require repository-side configuration.
+- No protected promotion or public-download reverification has been executed.
 
 ## Mandatory Release Gate
 
@@ -34,83 +40,84 @@ Every item below must be completed for the same archive SHA-256. A failure creat
 
 ### 1. Freeze The Candidate
 
-- [ ] Select a SemVer release candidate and immutable commit.
-- [ ] Confirm the worktree and module graph are clean.
-- [ ] Run `sh ./scripts/check.sh`.
-- [ ] Run `go test -count=1 ./...`.
-- [ ] Run `go test -race ./...`.
-- [ ] Run `staticcheck ./...` using the pinned release tool version.
-- [ ] Run `govulncheck ./...` and record reachable findings or approved exceptions.
-- [ ] Run `sh ./scripts/verify-delivery-assets.sh`.
-- [ ] Record actionlint, shellcheck, systemd-unit, staged nftables, bundle, license, notice, and sanitization results.
+- [x] Select a SemVer release candidate and immutable commit.
+- [x] Confirm the worktree and module graph are clean.
+- [x] Run `sh ./scripts/check.sh`.
+- [x] Run `go test -count=1 ./...`.
+- [x] Run `go test -race ./...`.
+- [x] Run `staticcheck ./...` using the pinned release tool version.
+- [x] Run `govulncheck ./...` and record reachable findings or approved exceptions.
+- [x] Run `sh ./scripts/verify-delivery-assets.sh`.
+- [x] Record actionlint, shellcheck, systemd-unit, staged nftables, bundle, license, notice, and sanitization results.
 
 ### 2. Build And Identify Exact Bytes
 
-- [ ] Build `cnftctl-VERSION-debian13-amd64.tar.gz` once from the selected commit.
-- [ ] Record archive filename, byte size, SHA-256, commit, Go version, and build-run URL.
-- [ ] Verify the extracted archive offline with `scripts/verify-bundle`.
-- [ ] Confirm the manifest says Debian 13, amd64, the intended version, and format version `1`.
-- [ ] Confirm every delivered regular file is covered by `SHA256SUMS` and no extra file or symlink exists.
-- [ ] Generate and retain the SPDX SBOM and keyless build provenance for these exact bytes.
+- [x] Build `cnftctl-VERSION-debian13-amd64.tar.gz` once from the selected commit.
+- [x] Record archive filename, byte size, SHA-256, commit, Go version, and build-run URL.
+- [x] Verify the extracted archive offline with `scripts/verify-bundle`.
+- [x] Confirm the manifest says Debian 13, amd64, the intended version, and format version `1`.
+- [x] Confirm every delivered regular file is covered by `SHA256SUMS` and no extra file or symlink exists.
+- [x] Generate and retain the SPDX SBOM and keyless build provenance for these exact bytes.
 
 ### 3. Prepare Validation Hosts
 
-- [ ] Create clean disposable Debian 13 amd64 `HOST_A` without Docker.
-- [ ] Create clean disposable Debian 13 amd64 `HOST_B` with disposable Docker.
-- [ ] Record image identity, kernel, nftables, systemd, Docker, architecture, and UTC start time.
+- [x] Create clean disposable Debian 13 amd64 `HOST_A` without Docker.
+- [x] Create clean disposable Debian 13 amd64 `HOST_B` with disposable Docker.
+- [x] Record image identity, kernel, nftables, systemd, Docker, architecture, and UTC start time.
 - [ ] Verify console or hypervisor recovery works before firewall activation.
 - [ ] Keep an independent SSH session and console available throughout remote-policy tests.
 
 ### 4. Validate Installation And Base Lifecycle
 
-- [ ] Complete Artifact Identity and Staged Install sections in `docs/manual-validation.md`.
-- [ ] Verify installation activates no firewall policy and enables only boot reconciliation.
-- [ ] Verify `init --dry-run`, desired-config permissions/defaults, JSON reports, and exact candidate validation.
-- [ ] Verify first-install timeout removes only `inet hostfw`.
-- [ ] Verify confirmation persists and stops rollback supervision only after durable confirmation.
-- [ ] Verify a later unconfirmed update restores the exact previous generation.
-- [ ] Verify generation files, manifests, modes, inventory, and hashes.
+- [x] Complete Artifact Identity and Staged Install sections in `docs/manual-validation.md`.
+- [x] Verify installation activates no firewall policy and enables only boot reconciliation.
+- [x] Verify `init --dry-run`, desired-config permissions/defaults, JSON reports, and exact candidate validation.
+- [x] Verify first-install timeout removes only `inet hostfw`.
+- [x] Verify confirmation persists and stops rollback supervision only after durable confirmation.
+- [x] Verify a later unconfirmed update restores the exact previous generation.
+- [x] Verify generation files, manifests, modes, inventory, and hashes.
 
 ### 5. Validate Failure Recovery
 
-- [ ] Verify terminating the initiating SSH process does not cancel rollback.
-- [ ] Verify reboot treats every unconfirmed transaction as failed and restores last-known-good policy.
-- [ ] Verify confirmed policy loads through `cnftctl-firewall.service` after reboot.
-- [ ] Verify foreign nftables tables survive apply, confirm, timeout rollback, explicit rollback, and reboot.
-- [ ] Capture timestamped journal evidence that rollback supervision was active before selector mutation and firewall activation.
+- [x] Verify terminating the initiating SSH process does not cancel rollback.
+- [x] Verify reboot treats every unconfirmed transaction as failed and restores last-known-good policy.
+- [x] Verify confirmed policy loads through `cnftctl-firewall.service` after reboot.
+- [x] Verify foreign nftables tables survive apply, confirm, timeout rollback, explicit rollback, and reboot.
+- [x] Capture timestamped journal evidence that rollback supervision was active before selector mutation and firewall activation.
 - [ ] Exercise incident checks and recovery commands in `docs/incident-response.md` from console access.
 
 ### 6. Validate SSH And DDNS Safety
 
-- [ ] Verify an uncovered current SSH source blocks hardened apply.
-- [ ] Verify the lockout-risk override requires a reason and records it durably.
-- [ ] Verify the override does not bypass rollback or other readiness checks.
-- [ ] Verify initial DDNS entries are present in the activated exact generation before hardened policy takes effect.
-- [ ] Verify A entries, AAAA `/56`, AAAA `/64`, timeouts, all-host failure behavior, stale metadata, and one-batch replacement.
-- [ ] Verify DDNS timer enablement follows active-generation intent through apply, rollback, disable, and reboot.
+- [x] Verify an uncovered current SSH source blocks hardened apply.
+- [x] Verify the lockout-risk override requires a reason and records it durably.
+- [x] Verify the override does not bypass rollback or other readiness checks.
+- [x] Verify initial DDNS entries are present in the activated exact generation before hardened policy takes effect.
+- [x] Verify A entries, AAAA `/56`, AAAA `/64`, timeouts, all-host failure behavior, stale metadata, and one-batch replacement.
+- [x] Verify DDNS timer enablement follows active-generation intent through apply, rollback, disable, and reboot.
 
 ### 7. Validate Docker Coexistence
 
-- [ ] Verify Docker-owned tables survive all cnftctl lifecycle operations and reboot.
-- [ ] Verify a published container port is blocked until matching `open_ports` intent is applied and confirmed.
-- [ ] Verify closing the port blocks it again without restarting Docker.
-- [ ] Verify IPv4 original public destination-port gating.
-- [ ] Validate IPv6 DNAT/routed behavior when the environment supports it, or record `NOT EXERCISED`; Docker remains experimental until separately qualified.
-- [ ] Verify live Docker daemon backend planning validates the exact proposal and is non-mutating; unsupported backends are refused, while a supported write preserves unrelated JSON, creates a backup, and does not restart Docker.
+- [x] Verify Docker-owned tables survive all cnftctl lifecycle operations and reboot.
+- [x] Verify a published container port is blocked until matching `open_ports` intent is applied and confirmed.
+- [x] Verify closing the port blocks it again without restarting Docker.
+- [x] Verify IPv4 original public destination-port gating.
+- [x] Validate IPv6 DNAT/routed behavior when the environment supports it, or record `NOT EXERCISED`; Docker remains experimental until separately qualified.
+- [x] Verify live Docker daemon backend planning validates the exact proposal, is non-mutating, and refuses unsupported backends.
+- [ ] On a daemon that supports the proposed backend, verify an authorized write preserves unrelated JSON, creates a backup, and does not restart Docker. This remains deferred with Docker production qualification because Debian Docker 26 rejects the option.
 
 ### 8. Validate Operations, Upgrade, And Uninstall
 
-- [ ] Verify healthy, degraded, pending, failed, unknown, absent, and unsupported report behavior where applicable.
-- [ ] Verify JSON schema `cnftctl.report.v1`, detail redaction, stdout purity, and exit codes `0`, `1`, and `2`.
-- [ ] Verify journals are actionable and contain no credentials or unsafe environment output.
-- [ ] Verify upgrade preserves config, immutable generations, ownership, active policy, and terminal transaction audit records.
-- [ ] Verify upgrade refuses unresolved, corrupt, malformed, or symlinked transaction state.
-- [ ] Verify uninstall refuses active policy and unresolved transactions.
-- [ ] Verify approved inactive uninstall removes delivery assets, reloads systemd, and preserves operator configuration unless separately purged.
+- [x] Verify healthy, degraded, pending, failed, unknown, absent, and unsupported report behavior where applicable.
+- [x] Verify JSON schema `cnftctl.report.v1`, detail redaction, stdout purity, and exit codes `0`, `1`, and `2`.
+- [x] Verify journals are actionable and contain no credentials or unsafe environment output.
+- [x] Verify upgrade preserves config, immutable generations, ownership, active policy, and terminal transaction audit records.
+- [x] Verify upgrade refuses unresolved, corrupt, malformed, or symlinked transaction state.
+- [x] Verify uninstall refuses active policy and unresolved transactions.
+- [x] Verify approved inactive uninstall removes delivery assets, reloads systemd, and preserves operator configuration unless separately purged.
 
 ### 9. Approve And Promote
 
-- [ ] Complete `docs/validation-record.md` without blank `PASS/FAIL/NOT EXERCISED` fields.
+- [x] Complete a version-specific copy of `docs/validation-record.md` without blank `PASS/FAIL/NOT EXERCISED` fields.
 - [ ] Attach complete `docs/manual-validation.md` command output and journals to the release issue.
 - [ ] Record known limitations and every `NOT EXERCISED` item in release notes.
 - [ ] Obtain reviewer approval from someone other than the artifact producer.

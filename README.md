@@ -1,6 +1,6 @@
 # cnftctl
 
-> Install only a published Debian package whose checksum and GitHub attestation you have verified. See `docs/production-readiness.md` and the versioned validation record for release evidence.
+> Install only a published Debian package whose checksum and GitHub attestation you have verified. See `docs/production-readiness.md` and `docs/validation-record-0.1.0.md` for current release evidence.
 
 `cnftctl` manages one application-owned nftables profile, `inet hostfw`, on Debian 13 amd64 hosts. It is not a general firewall manager. It keeps operator-edited desired configuration separate from immutable active generations and never uses `flush ruleset`, so unrelated nftables owners such as Docker can coexist.
 
@@ -122,4 +122,5 @@ The bundle builder and reference files remain internal staging and sanitized beh
 - `docs/support-matrix.md`: supported and unsupported environments.
 - `docs/incident-response.md`: lockout, rollback, boot, DDNS, and Docker runbooks.
 - `docs/release-process.md`: release evidence and publication procedure.
-- `docs/release-notes.md`: release evidence template and limitations.
+- `docs/release-notes.md`: current candidate identity, evidence, and limitations.
+- `docs/validation-record-0.1.0.md`: exact-package HOST_A/HOST_B validation record.

@@ -44,21 +44,22 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.version }}
         run: |
+          target_sha=$(git rev-parse HEAD)
           test "$(git tag --points-at HEAD)" = "v$VERSION"
-          test "$(git rev-list -n 1 "v$VERSION^{commit}")" = "$GITHUB_SHA"
+          test "$(git rev-list -n 1 "v$VERSION^{commit}")" = "$target_sha"
           test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN_ID" --jq .conclusion)" = success
           test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN_ID" --jq .name)" = "Release Candidate Build"
           test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN_ID" --jq .path)" = ".github/workflows/release-build.yml"
           test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN_ID" --jq .event)" = workflow_dispatch
-          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN_ID" --jq .head_sha)" = "$GITHUB_SHA"
-          relation=$(gh api "repos/$GITHUB_REPOSITORY/compare/$GITHUB_SHA...main" --jq .status)
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN_ID" --jq .head_sha)" = "$target_sha"
+          relation=$(gh api "repos/$GITHUB_REPOSITORY/compare/$target_sha...main" --jq .status)
           case "$relation" in ahead|identical) ;; *) exit 1 ;; esac
           cd candidate
           test "$(find . -type f -printf '%P\n' | LC_ALL=C sort)" = "$(printf '%s\n' "cnftctl_${VERSION}_amd64.deb" release-checksums.txt sbom.spdx.json | LC_ALL=C sort)"
           test -z "$(find . -mindepth 1 -maxdepth 1 ! -type f -print -quit)"
           sha256sum --check release-checksums.txt
           test "$(wc -l <release-checksums.txt)" -eq 2
-          gh attestation verify "cnftctl_${VERSION}_amd64.deb" --repo "$GITHUB_REPOSITORY" --signer-workflow "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/workflows/release-build.yml@$GITHUB_SHA"
+          gh attestation verify "cnftctl_${VERSION}_amd64.deb" --repo "$GITHUB_REPOSITORY" --signer-workflow "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/workflows/release-build.yml@refs/heads/main"
           cd ..
           sh ./scripts/verify-deb.sh "candidate/cnftctl_${VERSION}_amd64.deb" "$VERSION"
       - name: Publish verified release

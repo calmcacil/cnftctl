@@ -31,9 +31,13 @@ if grep -Eq '(systemctl|systemctl_cmd).* (enable|start|enable --now|start --no-b
     exit 1
 fi
 grep -q 'name: Release Candidate Build$' "$root/.github/workflows/release-build.yml"
+# Match the signer identity emitted by attest-build-provenance for a build run
+# dispatched from protected main. Candidate run head_sha remains pinned to the
+# checked-out release tag commit by the promotion workflow.
+grep -q 'actions/workflows/release-build.yml@refs/heads/main' "$root/.github/workflows/release-promote.yml"
 # Match literal GitHub expression syntax.
 # shellcheck disable=SC2016
-grep -q 'actions/workflows/release-build.yml@\$GITHUB_SHA' "$root/.github/workflows/release-promote.yml"
+grep -q 'ref: v${{ inputs.version }}' "$root/.github/workflows/release-promote.yml"
 # Match literal GitHub expression syntax.
 # shellcheck disable=SC2016
 grep -q 'cnftctl_${{ inputs.version }}_amd64.deb' "$root/.github/workflows/release-build.yml"

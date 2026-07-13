@@ -5,6 +5,87 @@ root=${CNFTCTL_MAINT_ROOT:-}
 dest() { printf '%s%s\n' "$root" "$1"; }
 fail() { echo "cnftctl pre-install: $*" >&2; exit 1; }
 
+# On an upgrade, dpkg leaves the installed inspector available until after this
+# script runs. After a remove or purge, however, operator state is deliberately
+# preserved while package-owned helpers are gone. The incoming package payload
+# is not unpacked yet, so preinst must retain a self-contained validator for
+# that reinstall path.
+inspect_embedded() (
+    [ "$#" -eq 1 ] || exit 2
+    tx=$1
+    case $tx in ../*|./*|*'/../'*|*'/./'*) exit 1 ;; esac
+    [ -d "$tx" ] && [ ! -L "$tx" ] || exit 1
+    id=${tx##*/}
+    case $id in *[!0-9a-f]*|'') exit 1 ;; esac
+    [ "${#id}" -eq 32 ] || exit 1
+    state=$tx/state.json
+    [ -f "$state" ] && [ ! -L "$state" ] || exit 1
+    [ "$(tail -c 1 "$state" | wc -l)" -eq 1 ] || exit 1
+
+    awk -v expected_id="$id" '
+        BEGIN {
+            json_string = "\"([^\"\\\\]|\\\\[\"\\\\/bfnrt]|\\\\u[0-9A-Fa-f]{4})*\""
+        }
+        NR == 1 { if ($0 != "{") bad = 1; next }
+        NR == 2 { if ($0 != "  \"id\": \"" expected_id "\",") bad = 1; next }
+        NR == 3 {
+            if ($0 == "  \"phase\": \"confirmed\",") phase = "confirmed"
+            else if ($0 == "  \"phase\": \"rolled-back\",") phase = "rolled-back"
+            else bad = 1
+            next
+        }
+        NR == 4 { if ($0 !~ ("^  \"started_at\": " json_string ",$")) bad = 1; next }
+        NR == 5 { if ($0 !~ ("^  \"rollback_deadline\": " json_string ",$")) bad = 1; next }
+        NR == 6 { if ($0 !~ /^  "generation": "[0-9a-f]{64}",$/) bad = 1; next }
+        NR == 7 { if ($0 !~ /^  "previous_generation": "([0-9a-f]{64})?",$/) bad = 1; next }
+        NR == 8 { if ($0 !~ /^  "fresh_install": (true|false),$/) bad = 1; next }
+        NR == 9 { if ($0 !~ /^  "firewall_was_enabled": (true|false),$/) bad = 1; next }
+        NR == 10 {
+            if (phase == "confirmed" && $0 != "  \"confirmed\": true,") bad = 1
+            if (phase == "rolled-back" && $0 !~ /^  "confirmed": (true|false),$/) bad = 1
+            next
+        }
+        NR == 11 {
+            if (phase == "confirmed" && $0 != "  \"rolled_back\": false" && $0 != "  \"rolled_back\": false,") bad = 1
+            if (phase == "rolled-back" && $0 != "  \"rolled_back\": true" && $0 != "  \"rolled_back\": true,") bad = 1
+            if ($0 ~ /,$/) override = 1
+            next
+        }
+        NR == 12 {
+            if (!override) { if ($0 != "}") bad = 1; closed = 1; next }
+            if ($0 != "  \"ssh_override\": {") bad = 1
+            next
+        }
+        NR == 13 { if (!override || $0 !~ /^    "acknowledged": (true|false),$/) bad = 1; next }
+        NR == 14 { if (!override || $0 !~ ("^    \"reason\": " json_string "(,)?$")) bad = 1; reason_comma = ($0 ~ /,$/); next }
+        NR >= 15 && override {
+            if ($0 == "  }") {
+                if (!seen_source && !seen_context && reason_comma) bad = 1
+                if (seen_source && !seen_context && source_comma) bad = 1
+                closed_override = 1
+                next
+            }
+            if ($0 == "}") { if (!closed_override) bad = 1; closed = 1; next }
+            if (closed_override) { bad = 1; next }
+            if (!seen_source && $0 ~ ("^    \"source\": " json_string "(,)?$")) {
+                if (!reason_comma) bad = 1
+                seen_source = 1; source_comma = ($0 ~ /,$/); next
+            }
+            if (!seen_context && $0 ~ ("^    \"context\": " json_string "$")) {
+                if (!(seen_source ? source_comma : reason_comma)) bad = 1
+                seen_context = 1; next
+            }
+            bad = 1
+        }
+        NR > 12 && !override { bad = 1 }
+        END {
+            if (override && !closed_override) bad = 1
+            if (bad || !closed || phase == "") exit 1
+            print phase
+        }
+    ' "$state"
+)
+
 case ${1:-} in
     install|upgrade) ;;
     abort-upgrade) exit 0 ;;
@@ -25,10 +106,13 @@ transactions=$(dest /var/lib/cnftctl/transactions)
 [ ! -e "$transactions" ] || [ -d "$transactions" ] || fail "transaction history is unsafe"
 if [ -d "$transactions" ]; then
     inspect=${CNFTCTL_INSPECT_TRANSACTION:-$(dest /usr/lib/cnftctl/inspect-transaction)}
-    [ -x "$inspect" ] || fail "existing transaction history cannot be safely validated"
     for tx in "$transactions"/*; do
         [ -e "$tx" ] || continue
-        phase=$("$inspect" "$tx") || fail "transaction history is corrupt or unresolved"
+        if [ -x "$inspect" ]; then
+            phase=$("$inspect" "$tx") || fail "transaction history is corrupt or unresolved"
+        else
+            phase=$(inspect_embedded "$tx") || fail "transaction history is corrupt or unresolved"
+        fi
         case $phase in confirmed|rolled-back) ;; *) fail "transaction history is corrupt or unresolved" ;; esac
     done
 fi

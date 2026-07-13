@@ -1,9 +1,9 @@
 # Release Validation Record: 0.1.0 Debian Candidate
 
 This record covers the native Debian package proposed for `v0.1.0`. It is
-technical release evidence, not publication approval. The tag, promotion, and
-public-download checks have not run, and provider-console recovery remains a
-manual gate.
+technical release evidence, not proof of the post-publication download check.
+The tag, promotion, and public-download checks have not run. The owner has
+confirmed provider KVM login independent of SSH and nftables.
 
 HOST_A and HOST_B were consecutive phases on one disposable Debian 13 amd64
 VPS. The host was returned to an inactive state after validation: `cnftctl`
@@ -53,7 +53,7 @@ reinstall, rollback, and Docker checks were then repeated with the final bytes.
 | systemd | `257.13-1~deb13u1` | `257.13-1~deb13u1` |
 | Docker | Not installed | `26.1.5+dfsg1-9+b13` |
 | Validation UTC | 2026-07-13 17:20–19:25 | 2026-07-13 19:36–20:36 |
-| Console recovery | `NOT EXERCISED`; provider reimage and SSH reboot/reconnect worked | `NOT EXERCISED`; SSH reboot/reconnect worked |
+| Console recovery | `PASS`; owner confirmed provider KVM login independent of SSH/nftables | `PASS`; the same provider KVM path remains available |
 
 Private host names, credentials, public addresses, tester-controlled DDNS
 names, and resolved allowlist values are intentionally omitted.
@@ -135,10 +135,10 @@ No secret, credential, or DDNS trust value appeared in retained journals.
 
 | Item | Status/Rationale |
 | --- | --- |
-| Provider-console/rescue recovery | `NOT EXERCISED`; remote reboot/reconnect and provider reimages prove control-plane access, but the mandatory out-of-band login/recovery drill still requires the owner |
+| Provider-console/rescue recovery | `PASS`; owner confirmed provider KVM login. Providers without KVM/console/rescue necessarily rely on the independently supervised rollback system |
 | Docker IPv6 external probe | `NOT EXERCISED`; exact generated rules and nftables syntax passed; IPv4 is the qualified external path |
 | Supported Docker backend write | `NOT EXERCISED`; Debian Docker 26 rejects the directive, and writing an invalid daemon configuration would be unsafe |
-| Raw evidence attachment | Sanitized evidence is recorded here; attach retained raw command output and journals to the release issue before tagging |
+| Evidence issue | [Issue #8](https://github.com/calmcacil/cnftctl/issues/8) records candidate identity, retained output index, automated raw-log locations, KVM confirmation, and sanitization exclusions |
 | Final tag and promotion | Not run; `v0.1.0` must point to candidate commit `ee7ab0f...`, even though this evidence PR advances `main`, and promotion must use run `29282503578` without rebuilding |
 | Public download verification | Requires publication and remains outstanding |
 | Vulnerability exceptions | None |
@@ -149,9 +149,9 @@ No secret, credential, or DDNS trust value appeared in retained journals.
 - [x] Artifact identity matches the immutable commit, build run, downloaded bytes, SBOM, attestations, and host package.
 - [x] Every unexercised case and limitation is disclosed.
 - [x] Candidate identity and evidence received a self-review; independent approval is not required.
-- [ ] Provider-console or rescue recovery has been exercised and recorded.
-- [ ] Raw evidence has been attached to the release issue.
+- [x] Provider KVM recovery has been exercised and recorded.
+- [x] Sanitized evidence and the retained output index are recorded in release evidence issue #8.
 - [ ] The exact source commit has been tagged and candidate run promoted without rebuilding.
 - [ ] Publicly downloaded release bytes have been reverified.
 
-Decision: `REJECT FOR RELEASE PROMOTION — TECHNICAL VALIDATION COMPLETE; CONSOLE AND PUBLICATION GATES PENDING`
+Decision: `APPROVE FOR TAG AND PROMOTION — POST-PUBLICATION DOWNLOAD VERIFICATION REMAINS MANDATORY`

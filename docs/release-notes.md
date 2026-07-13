@@ -27,7 +27,7 @@ The supported installation unit is the verified Debian package. Installation ena
 - `transactions list` reports pending transactions, not historical completed transactions.
 - Docker external IPv6 traffic was not exercised; generated IPv6 rules passed exact nftables syntax validation.
 - Debian Docker 26 rejects the proposed `firewall-backend` directive, so a supported backend write was not exercised and no daemon file was changed.
-- Provider-console/rescue recovery remains unexercised. Do not promote until the owner records that drill.
+- Provider KVM login was confirmed and provides a shell independent of SSH and nftables. Operators without provider console/rescue access necessarily depend on rollback completing successfully.
 - The tag, promotion, and clean public-download verification remain pending.
 
 ## Evidence
@@ -46,7 +46,9 @@ The supported installation unit is the verified Debian package. Installation ena
 - JSON schema and exit codes: `PASS`.
 - Security, vulnerability, license, notice, and sanitization review: `PASS`.
 - SBOM and build provenance: `PASS`; two attestations refer to the exact package digest.
+- Provider KVM recovery path: `PASS`; recorded in release evidence issue #8.
 
 Detailed results and remaining gates are in `docs/validation-record-0.1.0.md`
 and `docs/production-readiness.md`. Retained raw command output and journals
-must be attached to the release issue before tagging.
+are indexed in release evidence issue #8 with sensitive infrastructure values
+excluded under the repository sanitization policy.

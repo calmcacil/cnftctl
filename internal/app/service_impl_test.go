@@ -363,10 +363,10 @@ type batchRunner struct {
 
 func (r *batchRunner) Run(_ context.Context, name string, args ...string) nft.Result {
 	r.calls++
-	if name != "nft" || len(args) != 2 || args[0] != "-f" {
+	if name != "nft" || len(args) < 2 || args[len(args)-2] != "-f" {
 		return nft.Result{Err: errors.New("unexpected command")}
 	}
-	data, err := os.ReadFile(args[1])
+	data, err := os.ReadFile(args[len(args)-1])
 	r.batch = string(data)
 	if err != nil {
 		return nft.Result{Err: err}
@@ -447,6 +447,23 @@ func TestAlternateRootRejectsOnlineCommandsWithoutRunnerCalls(t *testing.T) {
 	}
 }
 
+func TestOpenSSHApplyDoesNotCreateOverrideMetadata(t *testing.T) {
+	root := t.TempDir()
+	writeTestConfig(t, root, config.Default())
+	var stdout bytes.Buffer
+	err := (realService{runner: &appFakeRunner{}}).Run(context.Background(), IO{Stdout: &stdout, Stderr: &bytes.Buffer{}}, CommandRequest{
+		Command:     "apply",
+		Flags:       map[string][]string{"root": {root}, "dry-run": {"true"}},
+		Environment: map[string]string{"SSH_CONNECTION": "203.0.113.10 12345 198.51.100.10 22"},
+	})
+	if err != nil {
+		t.Fatalf("open SSH dry-run apply failed: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "dry-run: no files written and nftables not loaded") {
+		t.Fatalf("dry-run output missing plan: %q", stdout.String())
+	}
+}
+
 func TestManagedWriteRejectsSymlinkEscape(t *testing.T) {
 	root, outside := t.TempDir(), t.TempDir()
 	if err := os.Symlink(outside, filepath.Join(root, "etc")); err != nil {
@@ -462,20 +479,32 @@ func TestManagedWriteRejectsSymlinkEscape(t *testing.T) {
 }
 
 func TestParseOSReleaseExactValues(t *testing.T) {
-	values, err := parseOSRelease([]byte("ID=debian\nVERSION_ID=\"13\"\n"))
-	if err != nil || values["ID"] != "debian" || values["VERSION_ID"] != "13" {
+	values, err := parseOSRelease([]byte("ID=debian\nVERSION_ID=\"13\"\nVERSION_CODENAME=trixie\n"))
+	if err != nil || values["ID"] != "debian" || values["VERSION_ID"] != "13" || values["VERSION_CODENAME"] != "trixie" {
 		t.Fatalf("values=%v err=%v", values, err)
 	}
 	values, err = parseOSRelease([]byte("ID=debianized\nVERSION_ID=\"13\"\n"))
 	if err != nil || values["ID"] == "debian" {
 		t.Fatalf("substring was accepted: %v %v", values, err)
 	}
+	if _, err := parseOSRelease([]byte("ID=debian\t13\n")); err == nil {
+		t.Fatal("unquoted tab was accepted")
+	}
 }
 
 func FuzzNftSetJSON(f *testing.F) {
 	f.Add(`{"nftables":[{"set":{"elem":["203.0.113.1",{"prefix":{"addr":"2001:db8::","len":56}}]}}]}`)
+	f.Add(`{"nftables":[{"set":{"elem":[{"elem":{"val":"203.0.113.10","expires":3599}}]}}]}`)
 	f.Add(`{"nftables":[]}`)
 	f.Fuzz(func(t *testing.T, data string) { _, _ = parseNftSetElements(data) })
+}
+
+func TestParseNftSetElementsWithTimeoutMetadata(t *testing.T) {
+	data := `{"nftables":[{"set":{"elem":[{"elem":{"val":"203.0.113.10","expires":3599}},{"elem":{"val":{"prefix":{"addr":"2001:db8:1234:5600::","len":56}},"expires":3599}}]}}]}`
+	values, err := parseNftSetElements(data)
+	if err != nil || strings.Join(values, ",") != "203.0.113.10,2001:db8:1234:5600::/56" {
+		t.Fatalf("values=%v err=%v", values, err)
+	}
 }
 
 func TestNFTRuntimeRefreshUsesOneJointBatch(t *testing.T) {
@@ -596,6 +625,28 @@ func TestServiceDockerBackendRejectsInvalidBackendType(t *testing.T) {
 	}
 }
 
+func TestValidateDockerDaemonConfigUsesInstalledDaemon(t *testing.T) {
+	runner := &appFakeRunner{}
+	if err := validateDockerDaemonConfig(context.Background(), runner, []byte(`{"firewall-backend":"nftables"}`)); err != nil {
+		t.Fatal(err)
+	}
+	if len(runner.calls) != 1 || runner.calls[0].name != "dockerd" || len(runner.calls[0].args) != 2 || runner.calls[0].args[0] != "--validate" || !strings.HasPrefix(runner.calls[0].args[1], "--config-file=") {
+		t.Fatalf("unexpected daemon validation call: %#v", runner.calls)
+	}
+	path := strings.TrimPrefix(runner.calls[0].args[1], "--config-file=")
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("staged daemon configuration was not removed: %v", err)
+	}
+}
+
+func TestValidateDockerDaemonConfigRejectsUnsupportedBackend(t *testing.T) {
+	runner := &appFakeRunner{results: []nftResult{{stderr: "unknown option: firewall-backend", err: errors.New("exit status 1")}}}
+	err := validateDockerDaemonConfig(context.Background(), runner, []byte(`{"firewall-backend":"nftables"}`))
+	if err == nil || !strings.Contains(err.Error(), "rejected proposed configuration") || !strings.Contains(err.Error(), "no file was written") || !strings.Contains(err.Error(), "firewall-backend") {
+		t.Fatalf("expected actionable compatibility error, got %v", err)
+	}
+}
+
 func TestServiceAdoptReferenceRequiresYes(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "etc/nftables.d"), 0o755); err != nil {
@@ -691,7 +742,7 @@ func TestDDNSCandidateFinalizationUsesOneGenerationIdentity(t *testing.T) {
 		}
 		if filepath.Base(file.Path) == "firewall.nft" {
 			text := string(file.Data)
-			if !strings.Contains(text, apply.OwnershipMarker+":generation:"+generation) || !strings.Contains(text, apply.GenerationRoot+"/"+generation+"/whitelist.nft") {
+			if !strings.Contains(text, apply.OwnershipMarker+":generation:"+generation) || !strings.Contains(text, `include "whitelist.nft"`) {
 				t.Fatalf("final firewall identity mismatch:\n%s", text)
 			}
 		}
@@ -699,6 +750,31 @@ func TestDDNSCandidateFinalizationUsesOneGenerationIdentity(t *testing.T) {
 	derived, _, err := apply.FinalizeFiles(files, true)
 	if err != nil || derived != generation {
 		t.Fatalf("Apply derivation=%q err=%v, want %q", derived, err, generation)
+	}
+}
+
+func TestDDNSIntentGenerationIgnoresInitialResolvedElements(t *testing.T) {
+	cfg := config.Default()
+	cfg.SSH.DDNSWhitelist.Enabled = true
+	cfg.SSH.DDNSWhitelist.Hosts = []string{"router.example.com"}
+	desired, files, err := generationFiles("", cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	files, err = embedDDNSCandidate(files, ddns.RefreshResult{
+		IPv4: []netip.Addr{netip.MustParseAddr("203.0.113.10")},
+		IPv6: []netip.Prefix{netip.MustParsePrefix("2001:db8:1234:5600::/56")},
+	}, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, files, err = finalizeGeneration(files, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	intent, err := ddnsIntentGeneration(files)
+	if err != nil || intent != desired {
+		t.Fatalf("intent=%q err=%v, want %q", intent, err, desired)
 	}
 }
 

@@ -2,7 +2,7 @@
 
 set -eu
 
-root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 if [ ! -f "$root/go.mod" ] || [ ! -d "$root/.git" ]; then
     echo "scripts/check.sh must be run from a cnftctl repository checkout" >&2
     exit 1

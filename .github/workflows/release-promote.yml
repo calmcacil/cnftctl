@@ -13,6 +13,8 @@ on:
         type: string
 
 permissions:
+  actions: read
+  attestations: read
   contents: write
 
 concurrency:
@@ -39,16 +41,19 @@ jobs:
           path: candidate
       - name: Verify candidate, provenance, and version
         env:
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.version }}
         run: |
           test "$(git tag --points-at HEAD)" = "v$VERSION"
           test "$(git rev-list -n 1 "v$VERSION^{commit}")" = "$GITHUB_SHA"
-          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/${{ inputs.candidate_run_id }}" --jq .conclusion)" = success
-           test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/${{ inputs.candidate_run_id }}" --jq .name)" = "Release Candidate Build"
-          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/${{ inputs.candidate_run_id }}" --jq .head_sha)" = "$GITHUB_SHA"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN_ID" --jq .conclusion)" = success
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN_ID" --jq .name)" = "Release Candidate Build"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN_ID" --jq .path)" = ".github/workflows/release-build.yml"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN_ID" --jq .event)" = workflow_dispatch
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN_ID" --jq .head_sha)" = "$GITHUB_SHA"
           cd candidate
-          test "$(find . -type f -printf '%P\n' | LC_ALL=C sort)" = "$(printf '%s\n' "cnftctl-$VERSION-debian13-amd64.tar.gz" release-checksums.txt dist/sbom.spdx.json | LC_ALL=C sort)"
+          test "$(find . -type f -printf '%P\n' | LC_ALL=C sort)" = "$(printf '%s\n' "cnftctl-$VERSION-debian13-amd64.tar.gz" release-checksums.txt sbom.spdx.json | LC_ALL=C sort)"
           test -z "$(find . -mindepth 1 -maxdepth 1 ! -type f -print -quit)"
           sha256sum --check release-checksums.txt
           test "$(wc -l <release-checksums.txt)" -eq 2
@@ -56,9 +61,16 @@ jobs:
           mkdir unpacked
           tar -tzf "cnftctl-$VERSION-debian13-amd64.tar.gz" | grep -Eq '^cnftctl-[^/]+-debian13-amd64/$'
           tar -xzf "cnftctl-$VERSION-debian13-amd64.tar.gz" -C unpacked --no-same-owner --no-same-permissions
-          test "$(unpacked/cnftctl-$VERSION-debian13-amd64/bin/cnftctl --version)" = "cnftctl $VERSION"
+          bundle="unpacked/cnftctl-$VERSION-debian13-amd64"
+          "$bundle/scripts/verify-bundle" "$bundle"
+          test "$("$bundle/bin/cnftctl" --version)" = "cnftctl $VERSION"
       - name: Publish protected release
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.version }}
-        run: gh release create "v$VERSION" candidate/* --verify-tag --generate-notes
+        run: |
+          gh release create "v$VERSION" \
+            "candidate/cnftctl-$VERSION-debian13-amd64.tar.gz" \
+            candidate/release-checksums.txt \
+            candidate/sbom.spdx.json \
+            --verify-tag --generate-notes

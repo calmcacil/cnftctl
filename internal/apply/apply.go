@@ -541,12 +541,21 @@ func updateRollbackStage(ctx context.Context, root string, tx Transaction, runne
 	if err != nil {
 		return 0, err
 	}
+	current, previous := tx.Generation, tx.PreviousGeneration
+	if !present {
+		if own.Marker == OwnershipMarker && active == current && own.Generation == current {
+			return 0, nil
+		}
+		if own.Marker == OwnershipMarker && active == previous && (own.Generation == current || own.Generation == previous) {
+			return 1, nil
+		}
+		return 0, errors.New("rollback runtime ownership is inconsistent while the live table is absent")
+	}
 	markers := generationMarker.FindAllString(table, -1)
-	if !present || len(markers) != 1 {
+	if len(markers) != 1 {
 		return 0, errors.New("cannot verify rollback live generation")
 	}
 	live := strings.TrimPrefix(markers[0], OwnershipMarker+":generation:")
-	current, previous := tx.Generation, tx.PreviousGeneration
 	states := [][3]string{
 		{current, current, current},
 		{previous, current, current},
@@ -660,7 +669,7 @@ func verifyInstalledAssetsAt(root string) error {
 		return errors.New("required installed executable /usr/bin/cnftctl is unavailable or not executable")
 	}
 	checks := map[string]string{
-		"/usr/lib/systemd/system/cnftctl-firewall.service":  "ExecStart=/usr/bin/nft -f /var/lib/cnftctl/active/firewall.nft",
+		"/usr/lib/systemd/system/cnftctl-firewall.service":  "ExecStart=/usr/sbin/nft -I /var/lib/cnftctl/active -f /var/lib/cnftctl/active/firewall.nft",
 		"/usr/lib/systemd/system/cnftctl-reconcile.service": "ExecStart=/usr/bin/cnftctl reconcile",
 		"/usr/lib/systemd/system/cnftctl-rollback@.service": "ExecStart=/usr/bin/cnftctl rollback %i",
 	}

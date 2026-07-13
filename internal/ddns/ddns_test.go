@@ -117,9 +117,15 @@ func (r errorResolver) LookupAAAA(context.Context, string) ([]netip.Addr, error)
 
 func TestResolveAllowsPerFamilyAuthoritativeNoData(t *testing.T) {
 	cfg := Config{Enabled: true, Hosts: []string{"home.example.com"}}
-	result, err := Resolve(context.Background(), cfg, errorResolver{a: []netip.Addr{netip.MustParseAddr("203.0.113.10")}, aaaaErr: &net.DNSError{Err: "no data", IsNotFound: true}})
-	if err != nil || len(result.IPv4) != 1 {
-		t.Fatalf("result=%#v err=%v", result, err)
+	for _, noData := range []error{
+		&net.DNSError{Err: "no data", IsNotFound: true},
+		&net.DNSError{Err: "no suitable address found"},
+		&net.AddrError{Err: "no suitable address found", Addr: "home.example.com"},
+	} {
+		result, err := Resolve(context.Background(), cfg, errorResolver{a: []netip.Addr{netip.MustParseAddr("203.0.113.10")}, aaaaErr: noData})
+		if err != nil || len(result.IPv4) != 1 {
+			t.Fatalf("noData=%v result=%#v err=%v", noData, result, err)
+		}
 	}
 }
 

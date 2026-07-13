@@ -40,7 +40,7 @@ Do not describe an unexecuted check as passed. Record unsupported or unexercised
 
 Release automation must use least privilege, pin third-party actions to immutable commits, avoid `pull_request_target` for untrusted code, and expose no release secrets to pull-request jobs. Never force-push or silently replace a published artifact; issue a new version.
 
-The dormant workflows remain under `.github/workflows-disabled/` and must not be enabled piecemeal. Eventual activation must move them, without content or filename changes, to `.github/workflows/release-build.yml` and `.github/workflows/release-promote.yml`. The promotion workflow deliberately verifies attestations against the activated build path `actions/workflows/release-build.yml@$GITHUB_SHA`; changing that destination or the build workflow name requires updating and validating the promotion identity checks before activation.
+The build and promotion workflows are active together at `.github/workflows/release-build.yml` and `.github/workflows/release-promote.yml`. Promotion is manual and protected by the `release` environment; configure that environment to require independent approval before the first release. The promotion workflow deliberately verifies attestations against the build path `actions/workflows/release-build.yml@$GITHUB_SHA`; changing that path or the build workflow name requires updating and validating the promotion identity checks before use.
 
 ## Commit Convention
 

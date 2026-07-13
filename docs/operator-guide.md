@@ -86,7 +86,7 @@ sudo cnftctl docker backend plan
 sudo cnftctl apply
 ```
 
-Every WAN-reachable published port must also be in `open_ports`. Backend writes require `--yes`, create a backup, and do not restart Docker. Schedule a separate Docker restart and validate Docker's own tables and container reachability afterward.
+Every WAN-reachable published port must also be in `open_ports`. On the live host, backend plans and writes first ask the installed Docker daemon to validate the exact proposed JSON; unsupported versions are refused without changing the file. Backend writes require `--yes`, create a backup, and do not restart Docker. Schedule a separate Docker restart and validate Docker's own tables and container reachability afterward. An alternate-root preview cannot validate compatibility with the target host's Docker daemon.
 
 ## Status And Doctor
 

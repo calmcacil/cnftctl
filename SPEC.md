@@ -28,19 +28,21 @@ The only normal active-policy transition is `cnftctl apply`:
 
 1. Load and validate desired config.
 2. Render final-shaped generation files.
-3. Validate the exact final candidate bytes with `nft -c`.
+3. Validate the exact final candidate bytes with `nft -c`, using the candidate directory as nft's explicit include path.
 4. Acquire the runtime lock and reject concurrent or pending applies.
 5. Verify installed delivery assets and existing `inet hostfw` ownership.
 6. Durably write generation files, manifest, and prepared transaction state, then create pending runtime state.
 7. Arm and verify the installed `cnftctl-rollback@ID.service` and timer before changing the selector.
 8. Atomically update `/var/lib/cnftctl/active`.
-9. Restart the dedicated `cnftctl-firewall.service`, which activates the selected generation through `/etc/nftables.conf`.
+9. Restart the dedicated `cnftctl-firewall.service`, which activates the selected generation with its immutable directory as nft's explicit include path.
 10. Record ownership and reconcile the DDNS refresh timer with generation intent.
 11. Require confirmation before the fixed 120-second deadline.
 
 `confirm` durably marks the transaction confirmed and stops its rollback timer. On timeout, a fresh install deletes only `table inet hostfw` and removes the active selector; an update selects and loads the previous generation. Rollback also restores the prior generation's DDNS timer intent. Activation failures invoke the same recovery path.
 
-Rollback is systemd-owned through installed service and timer templates, not attached to the initiating process. `cnftctl-reconcile.service` runs during boot, treats every unconfirmed durable transaction as failed, and restores the last-known-good generation. The firewall service is a dedicated oneshot unit ordered before `network.target`; it uses the `cnftctl`-owned `/etc/nftables.conf` bootstrap rather than the distribution `nftables.service`.
+The installer enables and starts `cnftctl-reconcile.service`. The oneshot remains active after its successful initial reconciliation, so the firewall unit's required dependency cannot rerun reconciliation in the middle of an apply transaction. Both units are installed into `multi-user.target`; the firewall unit pulls in `network-pre.target`, while ordering and the required dependency prevent firewall activation until reconciliation succeeds. Boot reconciliation accepts an absent managed table only when the durable selector and ownership still match the unconfirmed transaction, then restores the prior generation before boot firewall activation.
+
+Rollback is systemd-owned through installed service and timer templates, not attached to the initiating process. `cnftctl-reconcile.service` runs during boot, treats every unconfirmed durable transaction as failed, and restores the last-known-good generation. The firewall service is a dedicated oneshot unit ordered before `network.target`; it loads the selected immutable generation directly rather than using the distribution `nftables.service`.
 
 ## SSH Safety Override
 
@@ -58,7 +60,7 @@ Refresh resolves all configured names before replacing both nftables sets in one
 
 Docker support is opt-in and strict: WAN-to-Docker forwarding is denied unless the protocol/port tuple exists in `open_ports`. Every open port represents public WAN exposure for both host services and Docker-published services when Docker gating is enabled. IPv4 DNAT compares the original public destination port. IPv6 DNAT and routed container traffic use the applicable destination-port gate. The forwarding chain otherwise preserves Docker's own forwarding behavior and unrelated Docker tables are untouched.
 
-Daemon configuration inspection and writing are separate from firewall apply. Backend writes preserve valid JSON, create a timestamped backup, require `--yes`, and never restart Docker.
+Daemon configuration inspection and writing are separate from firewall apply. Live backend plans and writes validate the exact proposed JSON with the installed Docker daemon and refuse unsupported directives without changing the file. Backend writes preserve valid JSON, create a timestamped backup, require `--yes`, and never restart Docker. Alternate-root previews remain offline and therefore cannot establish installed-daemon compatibility.
 
 ## Configuration And Commands
 

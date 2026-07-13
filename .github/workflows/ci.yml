@@ -76,7 +76,7 @@ jobs:
           go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
       - name: Validate workflows and shell
         run: |
-          actionlint .github/workflows/*.yml .github/workflows-disabled/*.yml
+          actionlint .github/workflows/*.yml
           shellcheck scripts/*.sh packaging/*.sh packaging/bundle/*.sh packaging/bundle/scripts/*
       - name: Verify systemd and delivery assets
         run: sh ./scripts/verify-delivery-assets.sh
@@ -86,7 +86,9 @@ jobs:
   nft-syntax:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    container: debian:trixie-20250630-slim
+    container:
+      image: debian:trixie-20250630-slim
+      options: --cap-add NET_ADMIN
     steps:
       - name: Install runner dependencies
         run: apt-get update && apt-get install --yes ca-certificates git nftables

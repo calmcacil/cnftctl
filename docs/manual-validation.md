@@ -58,7 +58,7 @@ sudo nft list tables | tee /tmp/tables-before-first-apply
 
 - [ ] Install rejects a non-Debian-13 or non-amd64 test root/host.
 - [ ] Install does not create or load `inet hostfw`.
-- [ ] Install enables boot reconciliation but leaves the firewall service disabled until a successful apply.
+- [ ] Install enables and starts boot reconciliation but leaves the firewall service disabled until a successful apply.
 - [ ] `init --dry-run` writes nothing.
 - [ ] Desired config is mode `0600`, schema version `1`, SSH mode `open`, and has no open public ports.
 - [ ] JSON parses and has schema `cnftctl.report.v1`.
@@ -210,7 +210,8 @@ sudo cnftctl docker backend plan
 - [ ] IPv4 DNAT is gated by original public destination port.
 - [ ] If the test host has supported IPv6 Docker DNAT/routing, matching traffic is strictly gated by destination port; otherwise record it as not exercised, not passed.
 - [ ] Backend plan writes nothing.
-- [ ] Backend write refuses without `--yes`, preserves other JSON keys, creates a timestamped backup, and does not restart Docker.
+- [ ] Live backend plan validates the exact proposal with the installed Docker daemon and refuses an unsupported backend without writing.
+- [ ] Backend write refuses without `--yes`; a supported write preserves other JSON keys, creates a timestamped backup, and does not restart Docker.
 
 ## Status, Doctor, Logs, And Exit Codes
 

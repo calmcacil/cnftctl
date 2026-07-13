@@ -328,8 +328,15 @@ func SaveMetadata(path string, metadata Metadata) error {
 }
 
 func isAuthoritativeNoData(err error) bool {
+	var addrErr *net.AddrError
+	if errors.As(err, &addrErr) && addrErr.Err == "no suitable address found" {
+		return true
+	}
 	var dnsErr *net.DNSError
-	return errors.As(err, &dnsErr) && dnsErr.IsNotFound && !dnsErr.IsTimeout && !dnsErr.IsTemporary
+	if !errors.As(err, &dnsErr) || dnsErr.IsTimeout || dnsErr.IsTemporary {
+		return false
+	}
+	return dnsErr.IsNotFound || dnsErr.Err == "no suitable address found"
 }
 
 func errorCode(err error) string {

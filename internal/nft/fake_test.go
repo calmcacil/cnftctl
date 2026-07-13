@@ -36,8 +36,8 @@ func TestValidateAndLoadUseNft(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []call{
-		{Name: "nft", Args: []string{"-c", "-f", "/tmp/nftables.conf"}},
-		{Name: "nft", Args: []string{"-f", "/tmp/nftables.conf"}},
+		{Name: "nft", Args: []string{"-c", "-I", "/tmp", "-f", "/tmp/nftables.conf"}},
+		{Name: "nft", Args: []string{"-I", "/tmp", "-f", "/tmp/nftables.conf"}},
 	}
 	if !reflect.DeepEqual(r.calls, want) {
 		t.Fatalf("calls = %#v, want %#v", r.calls, want)
@@ -88,7 +88,7 @@ func TestDeleteTableUsesTargetedBatch(t *testing.T) {
 	if err := DeleteTable(context.Background(), r, "inet", "hostfw"); err != nil {
 		t.Fatal(err)
 	}
-	if len(r.calls) != 1 || !reflect.DeepEqual(r.calls[0].Args[:1], []string{"-f"}) {
+	if len(r.calls) != 1 || !reflect.DeepEqual(r.calls[0].Args[:1], []string{"-I"}) {
 		t.Fatalf("calls = %#v", r.calls)
 	}
 }
@@ -105,7 +105,7 @@ func TestReplaceSetsUsesOneBatch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(r.calls) != 1 || r.calls[0].Args[0] != "-f" {
+	if len(r.calls) != 1 || len(r.calls[0].Args) < 2 || r.calls[0].Args[len(r.calls[0].Args)-2] != "-f" {
 		t.Fatalf("calls = %#v", r.calls)
 	}
 }

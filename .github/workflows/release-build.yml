@@ -40,7 +40,26 @@ jobs:
           test "$(git rev-list -n 1 "v$VERSION^{commit}")" = "$GITHUB_SHA"
           test "$GITHUB_REF_NAME" = "v$VERSION" || test "$GITHUB_EVENT_NAME" = workflow_dispatch
       - name: Check source
-        run: sh ./scripts/check.sh
+        run: |
+          go mod verify
+          sh ./scripts/check.sh
+          go test -count=1 ./...
+          go test -race -count=1 ./...
+      - name: Install pinned release analyzers
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+          go install honnef.co/go/tools/cmd/staticcheck@2025.1.1
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+          sudo apt-get update
+          sudo apt-get install --yes nftables shellcheck
+      - name: Run release analysis and delivery checks
+        run: |
+          govulncheck ./...
+          staticcheck -checks=all,-S1016,-ST1000,-U1000 ./...
+          actionlint .github/workflows/*.yml
+          shellcheck scripts/*.sh packaging/*.sh packaging/bundle/*.sh packaging/bundle/scripts/*
+          sh ./scripts/verify-delivery-assets.sh
+          sh ./scripts/validate-staged.sh
       - name: Build bundle once
         env:
           VERSION: ${{ inputs.version }}
@@ -48,13 +67,13 @@ jobs:
       - name: Generate SPDX SBOM
         run: |
           go install github.com/anchore/syft/cmd/syft@v1.27.1
-          syft dir:dist -o spdx-json=dist/sbom.spdx.json
+          syft dir:dist -o spdx-json=sbom.spdx.json
       - name: Package and checksum candidate
         env:
           VERSION: ${{ inputs.version }}
         run: |
           tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner -C dist -czf "cnftctl-$VERSION-debian13-amd64.tar.gz" "cnftctl-$VERSION-debian13-amd64"
-          sha256sum "cnftctl-$VERSION-debian13-amd64.tar.gz" dist/sbom.spdx.json > release-checksums.txt
+          sha256sum "cnftctl-$VERSION-debian13-amd64.tar.gz" sbom.spdx.json > release-checksums.txt
       - name: Attest bundle provenance
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.2.2
         with:
@@ -63,7 +82,7 @@ jobs:
         uses: actions/attest-sbom@49f9f8f01a66efd2e17363a7f9b9f2ba56e9ac21 # v2.2.1
         with:
           subject-path: cnftctl-${{ inputs.version }}-debian13-amd64.tar.gz
-          sbom-path: dist/sbom.spdx.json
+          sbom-path: sbom.spdx.json
       - name: Upload immutable candidate
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -71,6 +90,6 @@ jobs:
           path: |
             cnftctl-${{ inputs.version }}-debian13-amd64.tar.gz
             release-checksums.txt
-            dist/sbom.spdx.json
+            sbom.spdx.json
           if-no-files-found: error
           retention-days: 14

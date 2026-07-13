@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -67,10 +68,11 @@ func fileCommand(ctx context.Context, r Runner, check bool, path string) error {
 	if path == "" {
 		return errors.New("nft config path is required")
 	}
-	args := []string{"-f", path}
+	includeDir := filepath.Dir(path)
+	args := []string{"-I", includeDir, "-f", path}
 	verb := "load"
 	if check {
-		args = []string{"-c", "-f", path}
+		args = []string{"-c", "-I", includeDir, "-f", path}
 		verb = "validate"
 	}
 	res := r.Run(ctx, "nft", args...)

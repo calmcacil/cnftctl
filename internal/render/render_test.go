@@ -30,7 +30,7 @@ func TestFreshConfigSnapshot(t *testing.T) {
 	}
 }
 
-func TestGenerationFilesUseFinalAbsoluteIncludesAndNoSystemdUnits(t *testing.T) {
+func TestGenerationFilesUseRelativeIncludesAndNoSystemdUnits(t *testing.T) {
 	dir := "/var/lib/cnftctl/generations/0123456789abcdef"
 	files, err := GenerationFiles(Config{SSH: SSHConfig{DDNSWhitelist: DDNSWhitelist{Enabled: true}}}, dir)
 	if err != nil {
@@ -39,8 +39,8 @@ func TestGenerationFilesUseFinalAbsoluteIncludesAndNoSystemdUnits(t *testing.T) 
 	if len(files) != 4 {
 		t.Fatalf("files = %#v", files)
 	}
-	if !strings.Contains(files[0].Content, `include "`+dir+`/whitelist.nft"`) || !strings.Contains(files[0].Content, OwnershipMarker) {
-		t.Fatalf("generation policy lacks final includes/marker:\n%s", files[0].Content)
+	if !strings.Contains(files[0].Content, `include "whitelist.nft"`) || !strings.Contains(files[0].Content, `include "open-ports.nft"`) || !strings.Contains(files[0].Content, OwnershipMarker) {
+		t.Fatalf("generation policy lacks relative includes/marker:\n%s", files[0].Content)
 	}
 	for _, file := range files {
 		if strings.Contains(file.Path, "/systemd/") || file.Path == "/etc/nftables.conf" {
@@ -54,8 +54,32 @@ func TestFilesUseStableGenerationPlaceholder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(files[0].Content, GenerationPlaceholder+"/whitelist.nft") {
-		t.Fatalf("logical firewall does not use generation placeholder:\n%s", files[0].Content)
+	if !strings.Contains(files[0].Content, `include "whitelist.nft"`) {
+		t.Fatalf("logical firewall does not use relative includes:\n%s", files[0].Content)
+	}
+}
+
+func TestEmptyOpenPortsOmitsEmptyElementsBlock(t *testing.T) {
+	content, err := OpenPorts(Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(content, "elements") {
+		t.Fatalf("empty open_ports set contains an invalid elements block:\n%s", content)
+	}
+}
+
+func TestHardenedIPv4OnlyWhitelistOmitsEmptyIPv6SetAndRule(t *testing.T) {
+	cfg := Config{SSH: SSHConfig{Mode: SSHWhitelistOnly, StaticWhitelist: StaticWhitelist{IPv4: []string{"203.0.113.10/32"}}}}
+	files, err := Files(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(files[0].Content, "$whitelist_v6") || strings.Contains(files[2].Content, "whitelist_v6") {
+		t.Fatalf("IPv4-only policy rendered an empty IPv6 whitelist:\n%s\n%s", files[0].Content, files[2].Content)
+	}
+	if !strings.Contains(files[0].Content, "$whitelist_v4") || !strings.Contains(files[2].Content, "define whitelist_v4") {
+		t.Fatalf("IPv4 whitelist missing from hardened policy:\n%s\n%s", files[0].Content, files[2].Content)
 	}
 }
 

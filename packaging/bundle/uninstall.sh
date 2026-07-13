@@ -3,7 +3,7 @@ set -eu
 
 root=${CNFTCTL_INSTALL_ROOT:-}
 systemctl_cmd=${CNFTCTL_SYSTEMCTL:-systemctl}
-bundle=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+bundle=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 force=0
 case $#:${1:-} in
     0:) ;;
@@ -34,12 +34,12 @@ transactions=$(dest /var/lib/cnftctl/transactions)
 if [ -d "$transactions" ]; then
     for tx in "$transactions"/*; do
         [ -e "$tx" ] || continue
-        [ -d "$tx" ] && [ ! -L "$tx" ] || fail "transaction history is unsafe"
+        if [ ! -d "$tx" ] || [ -L "$tx" ]; then fail "transaction history is unsafe"; fi
         id=${tx##*/}
         case $id in *[!0-9a-f]*) fail "transaction history is corrupt" ;; esac
         [ "${#id}" -eq 32 ] || fail "transaction history is corrupt"
         state=$tx/state.json
-        [ -f "$state" ] && [ ! -L "$state" ] || fail "transaction history is unsafe"
+        if [ ! -f "$state" ] || [ -L "$state" ]; then fail "transaction history is unsafe"; fi
         phase=$("$bundle/scripts/inspect-transaction" "$tx") || fail "transaction history is corrupt or unresolved"
         case $phase in confirmed|rolled-back) ;; *) fail "transaction history is corrupt or unresolved" ;; esac
     done

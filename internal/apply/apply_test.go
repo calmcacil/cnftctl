@@ -36,8 +36,8 @@ func (f *fakeRunner) Run(_ context.Context, name string, args ...string) nft.Res
 		if name == "nft" && len(args) >= 4 && args[0] == "list" && args[1] == "table" {
 			return nft.Result{Stdout: `table inet hostfw { comment "` + f.liveMarker + `" }`}
 		}
-		if name == "nft" && len(args) == 2 && args[0] == "-f" {
-			if data, err := os.ReadFile(args[1]); err == nil {
+		if name == "nft" && len(args) >= 2 && args[len(args)-2] == "-f" {
+			if data, err := os.ReadFile(args[len(args)-1]); err == nil {
 				if marker := generationMarker.Find(data); marker != nil {
 					f.liveMarker = string(marker)
 				}
@@ -376,7 +376,7 @@ func TestFreshRollbackDeletesOnlyManagedTable(t *testing.T) {
 	if err := Restore(context.Background(), root, dir, r); err != nil && !errors.Is(err, os.ErrNotExist) {
 		t.Fatal(err)
 	}
-	if len(r.calls) < 3 || r.calls[0].name != "nft" || r.calls[1].name != "nft" || r.calls[1].args[0] != "-f" {
+	if len(r.calls) < 3 || r.calls[0].name != "nft" || r.calls[1].name != "nft" || r.calls[1].args[len(r.calls[1].args)-2] != "-f" {
 		t.Fatalf("calls = %#v", r.calls)
 	}
 }
@@ -391,8 +391,12 @@ func TestValidateCandidateDoesNotWriteDurableState(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(root, "var")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("validator wrote durable state: %v", err)
 	}
-	if len(r.calls) != 1 || r.calls[0].args[0] != "-c" {
+	if len(r.calls) != 1 {
 		t.Fatalf("calls = %#v", r.calls)
+	}
+	args := r.calls[0].args
+	if len(args) != 5 || args[0] != "-c" || args[1] != "-I" || args[2] != filepath.Dir(args[4]) || args[3] != "-f" || filepath.Base(args[4]) != "firewall.nft" {
+		t.Fatalf("candidate validation did not use its exact include directory: %#v", r.calls[0])
 	}
 }
 
@@ -556,6 +560,26 @@ func TestRollbackRestoresPriorGenerationAndDDNSIntent(t *testing.T) {
 	joined := fmtCalls(r.calls)
 	if !strings.Contains(joined, filepath.Join(prevDir, "firewall.nft")) || !strings.Contains(joined, "enable --now "+systemd.DDNSRefreshTimer) {
 		t.Fatalf("rollback commands:\n%s", joined)
+	}
+}
+
+func TestUpdateRollbackRestoresPreviousGenerationWhenLiveTableIsAbsentAfterReboot(t *testing.T) {
+	root, dir, tx, r := updateRollbackFixture(t)
+	r.results = []nft.Result{{Err: errors.New("missing"), Stderr: "No such file or directory"}}
+	if err := Restore(context.Background(), root, dir, r); err != nil {
+		t.Fatal(err)
+	}
+	active, err := activeGeneration(root)
+	if err != nil || active != tx.PreviousGeneration {
+		t.Fatalf("active=%q err=%v", active, err)
+	}
+	var own ownership
+	if err := readJSON(rooted(root, OwnershipPath), &own); err != nil || own.Generation != tx.PreviousGeneration {
+		t.Fatalf("ownership=%#v err=%v", own, err)
+	}
+	disk, err := readTransaction(dir)
+	if err != nil || !disk.RolledBack || disk.Phase != PhaseRolledBack {
+		t.Fatalf("transaction=%#v err=%v", disk, err)
 	}
 }
 
@@ -839,7 +863,7 @@ func TestVerifyInstalledAssetsStrictInventory(t *testing.T) {
 	files := map[string][]byte{
 		"/usr/bin/cnftctl":                                     []byte("binary"),
 		"/usr/lib/cnftctl/cnftctl-recover":                     []byte("recover"),
-		"/usr/lib/systemd/system/cnftctl-firewall.service":     []byte("ExecStart=/usr/bin/nft -f /var/lib/cnftctl/active/firewall.nft\n"),
+		"/usr/lib/systemd/system/cnftctl-firewall.service":     []byte("ExecStart=/usr/sbin/nft -I /var/lib/cnftctl/active -f /var/lib/cnftctl/active/firewall.nft\n"),
 		"/usr/lib/systemd/system/cnftctl-reconcile.service":    []byte("ExecStart=/usr/bin/cnftctl reconcile\n"),
 		"/usr/lib/systemd/system/cnftctl-rollback@.service":    []byte("ExecStart=/usr/bin/cnftctl rollback %i\n"),
 		"/usr/lib/systemd/system/cnftctl-rollback@.timer":      []byte("timer"),

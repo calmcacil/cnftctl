@@ -5,10 +5,14 @@ Before=cnftctl-firewall.service network-pre.target
 
 [Service]
 Type=oneshot
+RemainAfterExit=yes
 ExecStart=/usr/bin/cnftctl reconcile
 User=root
 Group=root
 UMask=0077
+RuntimeDirectory=cnftctl
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=yes
 NoNewPrivileges=yes
 PrivateTmp=yes
 PrivateDevices=yes
@@ -27,4 +31,4 @@ SystemCallArchitectures=native
 ReadWritePaths=/var/lib/cnftctl /run/cnftctl
 
 [Install]
-WantedBy=network-pre.target
+WantedBy=multi-user.target

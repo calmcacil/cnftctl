@@ -25,7 +25,7 @@ Not completed as release evidence:
 - No exact Debian 13 amd64 VM validation record exists for final archive bytes.
 - No independent reviewer has approved a completed validation record.
 - No keyless provenance, SBOM attestation, or protected promotion has been executed.
-- The release workflows remain intentionally inert under `.github/workflows-disabled/`.
+- The release workflows are active, but the protected `release` environment and independent approver still require repository-side configuration.
 - No public release has been created and reverified after download.
 
 ## Mandatory Release Gate
@@ -96,7 +96,7 @@ Every item below must be completed for the same archive SHA-256. A failure creat
 - [ ] Verify closing the port blocks it again without restarting Docker.
 - [ ] Verify IPv4 original public destination-port gating.
 - [ ] Validate IPv6 DNAT/routed behavior when the environment supports it, or record `NOT EXERCISED`; Docker remains experimental until separately qualified.
-- [ ] Verify Docker daemon backend planning is non-mutating and writing preserves unrelated JSON, creates a backup, and does not restart Docker.
+- [ ] Verify live Docker daemon backend planning validates the exact proposal and is non-mutating; unsupported backends are refused, while a supported write preserves unrelated JSON, creates a backup, and does not restart Docker.
 
 ### 8. Validate Operations, Upgrade, And Uninstall
 
@@ -114,7 +114,7 @@ Every item below must be completed for the same archive SHA-256. A failure creat
 - [ ] Attach complete `docs/manual-validation.md` command output and journals to the release issue.
 - [ ] Record known limitations and every `NOT EXERCISED` item in release notes.
 - [ ] Obtain reviewer approval from someone other than the artifact producer.
-- [ ] Move both release workflows together to their documented active paths only after review.
+- [x] Move both reviewed release workflows together to their documented active paths.
 - [ ] Promote the exact validated bytes without rebuilding through the protected release environment.
 - [ ] Download the public archive in a clean environment and repeat checksum, provenance, and bundle verification.
 

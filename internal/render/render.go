@@ -89,7 +89,8 @@ func Files(cfg Config) ([]File, error) {
 	return policyFiles(model)
 }
 
-// GenerationFiles renders includes against the generation's final absolute path.
+// GenerationFiles renders generation files with relative includes. Callers load
+// firewall.nft with its containing directory as nft's explicit include path.
 func GenerationFiles(cfg Config, generationDir string) ([]File, error) {
 	clean := filepath.Clean(generationDir)
 	if !strings.HasPrefix(clean, "/var/lib/cnftctl/generations/") {

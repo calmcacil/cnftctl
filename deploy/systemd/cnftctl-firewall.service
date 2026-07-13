@@ -9,7 +9,7 @@ ConditionPathExists=/var/lib/cnftctl/active/firewall.nft
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/bin/nft -f /var/lib/cnftctl/active/firewall.nft
+ExecStart=/usr/sbin/nft -I /var/lib/cnftctl/active -f /var/lib/cnftctl/active/firewall.nft
 User=root
 Group=root
 UMask=0077
@@ -31,4 +31,4 @@ SystemCallArchitectures=native
 ReadOnlyPaths=/var/lib/cnftctl
 
 [Install]
-WantedBy=network-pre.target
+WantedBy=multi-user.target

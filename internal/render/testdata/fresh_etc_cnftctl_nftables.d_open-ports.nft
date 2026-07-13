@@ -5,6 +5,4 @@
 set open_ports {
     typeof meta l4proto . th dport
     flags interval
-    elements = {
-    }
 }

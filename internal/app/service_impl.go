@@ -109,9 +109,9 @@ func (s realService) Run(ctx context.Context, io IO, req CommandRequest) error {
 	case "docker status":
 		return s.dockerStatus(io, req)
 	case "docker backend plan":
-		return s.dockerBackend(io, req, false)
+		return s.dockerBackend(ctx, io, req, false)
 	case "docker backend write":
-		return s.dockerBackend(io, req, true)
+		return s.dockerBackend(ctx, io, req, true)
 	case "adopt reference":
 		return s.adoptReference(io, req)
 	case "preset decode":
@@ -187,7 +187,7 @@ func parseOSRelease(data []byte) (map[string]string, error) {
 				return nil, err
 			}
 			value = unquoted
-		} else if strings.ContainsAny(value, " \\t\"'") {
+		} else if strings.ContainsAny(value, " \t\"'") {
 			return nil, fmt.Errorf("invalid unquoted os-release value for %s", key)
 		}
 		values[key] = value
@@ -468,6 +468,12 @@ func (s realService) apply(ctx context.Context, io IO, req CommandRequest) error
 	if err := checkSSHSessionCoverage(ctx, cfg, req); err != nil {
 		return err
 	}
+	sshOverrideAcknowledged := req.BoolFlag("acknowledge-ssh-lockout-risk")
+	sshOverrideSource, sshOverrideContext := "", ""
+	if sshOverrideAcknowledged {
+		sshOverrideSource = "cli"
+		sshOverrideContext = firstNonEmpty(req.Environment["SSH_CONNECTION"], req.Environment["SSH_CLIENT"])
+	}
 	tx, plan, err := apply.Apply(ctx, apply.Options{
 		Root:                    req.Flag("root"),
 		Files:                   files,
@@ -477,10 +483,10 @@ func (s realService) apply(ctx context.Context, io IO, req CommandRequest) error
 		RollbackTimeout:         120 * time.Second,
 		Runner:                  s.runner,
 		Systemd:                 systemd.Manager{Runner: s.runner},
-		SSHOverrideAcknowledged: req.BoolFlag("acknowledge-ssh-lockout-risk"),
+		SSHOverrideAcknowledged: sshOverrideAcknowledged,
 		SSHOverrideReason:       req.Flag("reason"),
-		SSHOverrideSource:       "cli",
-		SSHOverrideContext:      firstNonEmpty(req.Environment["SSH_CONNECTION"], req.Environment["SSH_CLIENT"]),
+		SSHOverrideSource:       sshOverrideSource,
+		SSHOverrideContext:      sshOverrideContext,
 		DDNSDesired:             cfg.SSH.DDNSWhitelist.Enabled,
 	})
 	if err != nil {
@@ -944,7 +950,7 @@ func (s realService) dockerStatus(io IO, req CommandRequest) error {
 	return nil
 }
 
-func (s realService) dockerBackend(io IO, req CommandRequest, write bool) error {
+func (s realService) dockerBackend(ctx context.Context, io IO, req CommandRequest, write bool) error {
 	requestedPath := firstNonEmpty(req.Flag("daemon-json"), "/etc/docker/daemon.json")
 	path := rooted(req.Flag("root"), requestedPath)
 	if write {
@@ -964,6 +970,11 @@ func (s realService) dockerBackend(io IO, req CommandRequest, write bool) error 
 		return err
 	}
 	if !plan.Changed {
+		if req.Flag("root") == "" {
+			if err := validateDockerDaemonConfig(ctx, s.runner, before); err != nil {
+				return err
+			}
+		}
 		fmt.Fprintf(io.Stdout, "%s already uses firewall-backend=nftables\n", plan.Path)
 		return nil
 	}
@@ -973,17 +984,68 @@ func (s realService) dockerBackend(io IO, req CommandRequest, write bool) error 
 		fmt.Fprintf(io.Stderr, "warning: %s\n", warning.Message)
 	}
 	if !write {
+		if req.Flag("root") == "" {
+			if err := validateDockerDaemonConfig(ctx, s.runner, plan.After); err != nil {
+				return err
+			}
+			fmt.Fprintln(io.Stdout, "Docker daemon accepts the proposed configuration")
+		}
 		fmt.Fprintln(io.Stdout, "dry-run: no Docker daemon files written")
 		return nil
 	}
 	if !req.BoolFlag("yes") {
 		return errors.New("writing Docker daemon configuration requires --yes; cnftctl will not restart Docker")
 	}
+	if req.Flag("root") == "" {
+		if err := validateDockerDaemonConfig(ctx, s.runner, plan.After); err != nil {
+			return err
+		}
+	}
 	if err := docker.WritePlan(plan); err != nil {
 		return err
 	}
 	fmt.Fprintf(io.Stdout, "updated %s; restart Docker manually when ready\n", plan.Path)
 	return nil
+}
+
+func validateDockerDaemonConfig(ctx context.Context, runner nft.Runner, data []byte) error {
+	if runner == nil {
+		return errors.New("docker daemon configuration validation is unavailable")
+	}
+	staged, err := os.CreateTemp("", "cnftctl-daemon.*.json")
+	if err != nil {
+		return fmt.Errorf("stage Docker daemon configuration for validation: %w", err)
+	}
+	path := staged.Name()
+	defer os.Remove(path)
+	if err := staged.Chmod(0o600); err != nil {
+		_ = staged.Close()
+		return fmt.Errorf("protect staged Docker daemon configuration: %w", err)
+	}
+	if _, err := staged.Write(data); err != nil {
+		_ = staged.Close()
+		return fmt.Errorf("stage Docker daemon configuration for validation: %w", err)
+	}
+	if err := staged.Sync(); err != nil {
+		_ = staged.Close()
+		return fmt.Errorf("sync staged Docker daemon configuration: %w", err)
+	}
+	if err := staged.Close(); err != nil {
+		return fmt.Errorf("close staged Docker daemon configuration: %w", err)
+	}
+
+	result := runner.Run(ctx, "dockerd", "--validate", "--config-file="+path)
+	if result.OK() {
+		return nil
+	}
+	detail := strings.TrimSpace(result.Stderr)
+	if detail == "" {
+		detail = strings.TrimSpace(result.Stdout)
+	}
+	if detail == "" {
+		detail = result.Err.Error()
+	}
+	return fmt.Errorf("docker daemon rejected proposed configuration; no file was written: %s", detail)
 }
 
 func (s realService) adoptReference(io IO, req CommandRequest) error {
@@ -1499,7 +1561,54 @@ func renderedInSync(root string, cfg config.Config) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return filepath.Base(target) == desired, nil
+	active := filepath.Base(target)
+	if !cfg.SSH.DDNSWhitelist.Enabled {
+		return active == desired, nil
+	}
+	genDir := rooted(root, apply.GenerationRoot+"/"+active)
+	var manifest apply.Manifest
+	manifestData, err := os.ReadFile(filepath.Join(genDir, "manifest.json"))
+	if err != nil || json.Unmarshal(manifestData, &manifest) != nil || manifest.Version != 1 || !manifest.DDNSDesired {
+		return false, errors.New("active DDNS generation manifest is invalid")
+	}
+	files := make([]apply.File, 0, len(manifest.Files))
+	for _, entry := range manifest.Files {
+		name := filepath.Base(entry.Path)
+		if name != entry.Path {
+			return false, errors.New("active DDNS generation manifest contains an unsafe path")
+		}
+		data, err := os.ReadFile(filepath.Join(genDir, name))
+		if err != nil {
+			return false, err
+		}
+		files = append(files, apply.File{Path: apply.GenerationRoot + "/" + active + "/" + name, Mode: os.FileMode(entry.Mode), Data: data})
+	}
+	intent, err := ddnsIntentGeneration(files)
+	return err == nil && intent == desired, err
+}
+
+func ddnsIntentGeneration(files []apply.File) (string, error) {
+	normalized := append([]apply.File(nil), files...)
+	for i := range normalized {
+		if filepath.Base(normalized[i].Path) == "firewall.nft" {
+			normalized[i].Data = stripDDNSCandidateElements(normalized[i].Data)
+		}
+	}
+	generation, _, err := apply.FinalizeFiles(normalized, true)
+	return generation, err
+}
+
+func stripDDNSCandidateElements(data []byte) []byte {
+	lines := strings.Split(string(data), "\n")
+	for i, line := range lines {
+		if !strings.Contains(line, "set ddns_whitelist_v4 ") && !strings.Contains(line, "set ddns_whitelist_v6 ") {
+			continue
+		}
+		if start := strings.Index(line, " elements = {"); start >= 0 && strings.HasSuffix(line, " }; }") {
+			lines[i] = line[:start] + " }"
+		}
+	}
+	return []byte(strings.Join(lines, "\n"))
 }
 
 func inspectDockerBackend(root, path string) (string, bool, error) {
@@ -1562,6 +1671,9 @@ func walkNftElement(value any, out *[]string) {
 			walkNftElement(child, out)
 		}
 	case map[string]any:
+		if elem, ok := v["elem"]; ok {
+			walkNftElement(elem, out)
+		}
 		if prefix, ok := v["prefix"].(map[string]any); ok {
 			addr, _ := prefix["addr"].(string)
 			length, ok := numberString(prefix["len"])

@@ -1,19 +1,17 @@
-# Release Notes And Evidence Template
+# Release Notes And Evidence: 0.1.0 Candidate
 
 ## Identity
 
-- Version/tag: `vX.Y.Z`
-- Commit: `FULL_SHA`
-- Artifact: `cnftctl_X.Y.Z_amd64.deb`
-- Artifact SHA-256: `RECORD_AT_RELEASE`
-- CI run: `RECORD_AT_RELEASE`
-- Tester and UTC date: `RECORD_AT_RELEASE`
+- Version/tag: `0.1.0` candidate; `v0.1.0` is not yet created
+- Commit: `ee7ab0fd6932bafe1c22b684ec72e27e50803f94`
+- Artifact: `cnftctl_0.1.0_amd64.deb` (`1712440` bytes)
+- Artifact SHA-256: `93966559a326522a984cc8dcd36a062d5f4931a8c51cacecdc847664b277b198`
+- CI run: [Release Candidate Build 29282503578](https://github.com/calmcacil/cnftctl/actions/runs/29282503578)
+- Tester and UTC date: project owner/Codex, 2026-07-13
 
 ## Scope
 
 This release provides the narrow `inet hostfw` manager for Debian 13 amd64, including desired YAML configuration, immutable generations, dedicated systemd activation, mandatory dead-man rollback and boot reconciliation, SSH session coverage checks with audited override, optional DDNS SSH sets, and optional strict Docker WAN gating.
-
-This template is not release evidence. Replace every placeholder with results from the exact canonical `cnftctl_X.Y.Z_amd64.deb` package on Debian 13 amd64 before publication.
 
 The supported installation unit is the verified Debian package. Installation enables only reconciliation and does not activate firewall policy, enable DDNS, or restart Docker.
 
@@ -27,23 +25,28 @@ The supported installation unit is the verified Debian package. Installation ena
 - The rollback timeout is fixed at 120 seconds.
 - Manual reference deployment and the internal bundle are behavior/build references, not supported installation paths.
 - `transactions list` reports pending transactions, not historical completed transactions.
-- Support remains withheld until all exact-artifact evidence below passes; do not substitute source-tree or code-fix results.
+- Docker external IPv6 traffic was not exercised; generated IPv6 rules passed exact nftables syntax validation.
+- Debian Docker 26 rejects the proposed `firewall-backend` directive, so a supported backend write was not exercised and no daemon file was changed.
+- Provider-console/rescue recovery remains unexercised. Do not promote until the owner records that drill.
+- The tag, promotion, and clean public-download verification remain pending.
 
 ## Evidence
 
-- CI checks: `PASS/FAIL` with URL.
-- Offline package verification, reproducibility, and lintian: `PASS/FAIL` with output attachment.
-- First-install timeout/table deletion: `PASS/FAIL`.
-- Confirm and prior-generation rollback: `PASS/FAIL`.
-- Initiating-session death and reboot reconciliation: `PASS/FAIL`.
-- SSH override audit: `PASS/FAIL`.
-- DDNS refresh, expiry/freshness, and timer reconciliation: `PASS/FAIL`.
-- Foreign nftables and Docker table coexistence: `PASS/FAIL`.
-- Strict Docker WAN gate: `PASS/FAIL/NOT EXERCISED`.
-- Fresh install, upgrade, and uninstall: `PASS/FAIL`.
-- JSON schema and exit codes: `PASS/FAIL`.
-- Security/license/notice review: `PASS/FAIL`.
+- CI checks: `PASS`; candidate run linked above.
+- Offline package verification, reproducibility, and lintian: `PASS`.
+- First-install timeout/table deletion: `PASS`.
+- Confirm and prior-generation rollback: `PASS`.
+- Initiating-session death and reboot reconciliation: `PASS`.
+- SSH override audit: `PASS`.
+- DDNS refresh, expiry/freshness, and timer reconciliation: `PASS`.
+- Foreign nftables and Docker table coexistence: `PASS`.
+- Strict Docker IPv4 WAN gate: `PASS`; external IPv6 `NOT EXERCISED`.
+- Fresh install, active reinstall, purge-preserved reinstall, upgrade, and uninstall: `PASS`.
+- Corrupt preserved-state refusal before unpack: `PASS`.
+- JSON schema and exit codes: `PASS`.
+- Security, vulnerability, license, notice, and sanitization review: `PASS`.
+- SBOM and build provenance: `PASS`; two attestations refer to the exact package digest.
 
-Attach the completed `docs/manual-validation.md` record. Replace every placeholder before publication; do not publish this template as evidence.
-
-Also attach a completed copy of `docs/validation-record.md` and show that every mandatory item in `docs/production-readiness.md` is closed for the same artifact SHA-256.
+Detailed results and remaining gates are in `docs/validation-record-0.1.0.md`
+and `docs/production-readiness.md`. Retained raw command output and journals
+must be attached to the release issue before tagging.

@@ -492,6 +492,50 @@ func TestParseOSReleaseExactValues(t *testing.T) {
 	}
 }
 
+func TestPlatformSupportTiers(t *testing.T) {
+	root := t.TempDir()
+	osRelease := filepath.Join(root, "os-release")
+	if err := os.WriteFile(osRelease, []byte("ID=debian\nVERSION_ID=13\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	amd64 := platformCheck(osRelease, "linux", "amd64")
+	if amd64.State != StateOK || amd64.Detail["support_tier"] != "production" || amd64.Detail["production_validated"] != true {
+		t.Fatalf("unexpected amd64 check: %#v", amd64)
+	}
+	arm64 := platformCheck(osRelease, "linux", "arm64")
+	if arm64.State != StateOK || arm64.Detail["support_tier"] != "experimental" || arm64.Detail["production_validated"] != false || !strings.Contains(arm64.Summary, "own risk") {
+		t.Fatalf("unexpected arm64 check: %#v", arm64)
+	}
+	for _, tc := range []struct{ os, arch string }{{"linux", "386"}, {"darwin", "arm64"}} {
+		if got := platformCheck(osRelease, tc.os, tc.arch); got.State != StateUnsupported {
+			t.Fatalf("%s/%s unexpectedly accepted: %#v", tc.os, tc.arch, got)
+		}
+	}
+}
+
+func TestPlatformRejectsWrongOrMalformedIdentity(t *testing.T) {
+	for name, contents := range map[string]string{
+		"wrong-distribution": "ID=ubuntu\nVERSION_ID=13\n",
+		"wrong-release":      "ID=debian\nVERSION_ID=12\n",
+		"malformed":          "ID=debian 13\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "os-release")
+			if err := os.WriteFile(path, []byte(contents), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if got := platformCheck(path, "linux", "arm64"); got.State != StateUnsupported {
+				t.Fatalf("identity unexpectedly accepted: %#v", got)
+			}
+		})
+	}
+	missing := platformCheck(filepath.Join(t.TempDir(), "missing"), "linux", "arm64")
+	if missing.State != StateUnknown || missing.Code != "os_release_unavailable" {
+		t.Fatalf("unexpected missing identity result: %#v", missing)
+	}
+}
+
 func FuzzNftSetJSON(f *testing.F) {
 	f.Add(`{"nftables":[{"set":{"elem":["203.0.113.1",{"prefix":{"addr":"2001:db8::","len":56}}]}}]}`)
 	f.Add(`{"nftables":[{"set":{"elem":[{"elem":{"val":"203.0.113.10","expires":3599}}]}}]}`)

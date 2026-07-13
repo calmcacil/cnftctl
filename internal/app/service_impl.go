@@ -155,19 +155,31 @@ func (s realService) status(ctx context.Context, io IO, req CommandRequest) erro
 }
 
 func platformCheckAt(path string) Check {
-	detail := map[string]any{"os": runtime.GOOS, "architecture": runtime.GOARCH}
-	if runtime.GOOS == "linux" && runtime.GOARCH == "amd64" {
+	return platformCheck(path, runtime.GOOS, runtime.GOARCH)
+}
+
+func platformCheck(path, goos, goarch string) Check {
+	detail := map[string]any{"os": goos, "architecture": goarch}
+	if goos == "linux" && (goarch == "amd64" || goarch == "arm64") {
 		data, err := os.ReadFile(path)
 		if err != nil {
-			return Check{ID: "platform.support", State: StateUnknown, Summary: "Linux amd64 detected; Debian release unknown", Code: "os_release_unavailable", Detail: detail}
+			return Check{ID: "platform.support", State: StateUnknown, Summary: fmt.Sprintf("Linux %s detected; Debian release unknown", goarch), Code: "os_release_unavailable", Detail: detail}
 		}
 		values, err := parseOSRelease(data)
 		if err == nil && values["ID"] == "debian" && values["VERSION_ID"] == "13" {
-			return Check{ID: "platform.support", State: StateOK, Summary: "Debian 13 amd64 is supported", Detail: detail}
+			if goarch == "amd64" {
+				detail["support_tier"] = "production"
+				detail["production_validated"] = true
+				return Check{ID: "platform.support", State: StateOK, Summary: "Debian 13 amd64 is production-supported", Detail: detail}
+			}
+			detail["support_tier"] = "experimental"
+			detail["production_validated"] = false
+			detail["risk"] = "unvalidated on a disposable live host; use at own risk"
+			return Check{ID: "platform.support", State: StateOK, Summary: "Debian 13 arm64 is experimental, unvalidated, and used at own risk", Detail: detail}
 		}
-		return Check{ID: "platform.support", State: StateUnsupported, Summary: "only Debian 13 amd64 is supported", Code: "unsupported_platform", Detail: detail}
+		return Check{ID: "platform.support", State: StateUnsupported, Summary: "only Debian 13 amd64 and experimental arm64 are available", Code: "unsupported_platform", Detail: detail}
 	}
-	return Check{ID: "platform.support", State: StateUnsupported, Summary: "only Debian 13 amd64 is supported", Code: "unsupported_platform", Detail: detail}
+	return Check{ID: "platform.support", State: StateUnsupported, Summary: "only Debian 13 amd64 and experimental arm64 are available", Code: "unsupported_platform", Detail: detail}
 }
 
 func parseOSRelease(data []byte) (map[string]string, error) {

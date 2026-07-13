@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-Only the latest published release on the supported Debian 13 amd64 target receives security fixes. The repository development branch and unpublished artifacts are not production support channels.
+Only the latest published release on the production-supported Debian 13 amd64 target receives security fixes. Published arm64 packages are experimental, unvalidated on a disposable live host, used at the operator's own risk, and carry no production-support or security-support guarantee. The repository development branch and unpublished artifacts are not production support channels.
 
 ## Reporting
 

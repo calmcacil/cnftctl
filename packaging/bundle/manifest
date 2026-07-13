@@ -1,5 +1,5 @@
 format=1
 product=cnftctl
-architecture=amd64
+architecture=@ARCH@
 os=debian-13
 version=@VERSION@

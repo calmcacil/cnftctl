@@ -58,9 +58,18 @@ jobs:
         # Style-only conversions and intentionally dormant code are reviewed separately.
         run: staticcheck -checks=all,-S1016,-ST1000,-U1000 ./...
 
-  delivery-assets:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+  delivery-native:
+    name: delivery-assets (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -81,11 +90,24 @@ jobs:
       - name: Verify systemd and delivery assets
         run: sh ./scripts/verify-delivery-assets.sh
       - name: Build and verify delivery package
+        env:
+          ARCH: ${{ matrix.arch }}
         run: |
-          sh ./scripts/build-bundle.sh 0.0.0-ci "$RUNNER_TEMP/cnftctl-bundle"
-          sh ./scripts/build-deb.sh 0.0.0-ci "$RUNNER_TEMP/cnftctl_0.0.0-ci_amd64.deb"
-          sh ./scripts/verify-deb.sh "$RUNNER_TEMP/cnftctl_0.0.0-ci_amd64.deb" 0.0.0-ci
-          lintian --fail-on error "$RUNNER_TEMP/cnftctl_0.0.0-ci_amd64.deb"
+          test "$(dpkg --print-architecture)" = "$ARCH"
+          sh ./scripts/check.sh
+          sh ./scripts/build-bundle.sh 0.0.0-ci "$ARCH" "$RUNNER_TEMP/cnftctl-bundle"
+          sh ./scripts/build-deb.sh 0.0.0-ci "$ARCH" "$RUNNER_TEMP/cnftctl_0.0.0-ci_${ARCH}.deb"
+          sh ./scripts/verify-deb.sh "$RUNNER_TEMP/cnftctl_0.0.0-ci_${ARCH}.deb" 0.0.0-ci "$ARCH"
+          "$RUNNER_TEMP/cnftctl-bundle/bin/cnftctl" --version
+          lintian --fail-on error "$RUNNER_TEMP/cnftctl_0.0.0-ci_${ARCH}.deb"
+
+  delivery-assets:
+    needs: delivery-native
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Confirm native delivery matrix
+        run: echo "amd64 and arm64 delivery checks passed"
 
   nft-syntax:
     runs-on: ubuntu-latest

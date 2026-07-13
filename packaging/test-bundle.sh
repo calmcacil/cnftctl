@@ -6,13 +6,28 @@ tmp=${TMPDIR:-/tmp}/cnftctl-bundle-test-$$
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM
 mkdir -m 0700 "$tmp"
 bundle=$tmp/bundle
-sh "$repo/scripts/build-bundle.sh" 0.0.0-test "$bundle" >/dev/null
+arch=$(dpkg --print-architecture)
+case $arch in amd64|arm64) ;; *) echo "tests require amd64 or arm64" >&2; exit 1 ;; esac
+sh "$repo/scripts/build-bundle.sh" 0.0.0-test "$arch" "$bundle" >/dev/null
+for candidate_arch in amd64 arm64; do
+    sh "$repo/scripts/build-bundle.sh" 0.0.0-test "$candidate_arch" "$tmp/$candidate_arch-1" >/dev/null
+    sh "$repo/scripts/build-bundle.sh" 0.0.0-test "$candidate_arch" "$tmp/$candidate_arch-2" >/dev/null
+    diff -qr "$tmp/$candidate_arch-1" "$tmp/$candidate_arch-2" >/dev/null || { echo "$candidate_arch bundle build is not reproducible" >&2; exit 1; }
+    CNFTCTL_BUNDLE_ARCH="$candidate_arch" "$tmp/$candidate_arch-1/scripts/verify-bundle" "$tmp/$candidate_arch-1" >/dev/null
+done
 go build -o "$tmp/cnftctl-native" "$repo/cmd/cnftctl"
 
 expect_fail() {
     "$@" >/dev/null 2>&1 && { echo "expected failure: $*" >&2; exit 1; }
     return 0
 }
+
+case $arch in amd64) other_arch=arm64 ;; arm64) other_arch=amd64 ;; esac
+expect_fail env CNFTCTL_BUNDLE_ARCH="$other_arch" "$bundle/scripts/verify-bundle" "$bundle"
+expect_fail sh "$repo/scripts/build-bundle.sh" 0.0.0-test riscv64 "$tmp/unsupported-bundle"
+CNFTCTL_INSTALL_ROOT="$tmp/arm64-warning-root" CNFTCTL_BUNDLE_ARCH=arm64 \
+    "$tmp/arm64-1/install.sh" >/dev/null 2>"$tmp/arm64-warning"
+grep -q 'EXPERIMENTAL.*use at your own risk' "$tmp/arm64-warning"
 
 cp -R "$bundle" "$tmp/extra"
 printf 'extra\n' >"$tmp/extra/extra"
@@ -43,7 +58,7 @@ EOF
 chmod 0755 "$tmp/systemctl"
 systemctl_log=$tmp/systemctl.log
 : >"$systemctl_log"
-CNFTCTL_INSTALL_ROOT="$root" CNFTCTL_BUNDLE_ARCH=amd64 CNFTCTL_TEST_SYSTEMD=1 CNFTCTL_SYSTEMCTL="$tmp/systemctl" CNFTCTL_SYSTEMCTL_LOG="$systemctl_log" "$bundle/install.sh" >/dev/null
+CNFTCTL_INSTALL_ROOT="$root" CNFTCTL_BUNDLE_ARCH="$arch" CNFTCTL_TEST_SYSTEMD=1 CNFTCTL_SYSTEMCTL="$tmp/systemctl" CNFTCTL_SYSTEMCTL_LOG="$systemctl_log" "$bundle/install.sh" >/dev/null
 [ "$(sed -n '/^enable /p' "$systemctl_log")" = "enable --now cnftctl-reconcile.service" ] || { echo "installer enabled an unexpected service" >&2; exit 1; }
 ! grep -q 'cnftctl-firewall.service' "$systemctl_log" || { echo "installer touched firewall service" >&2; exit 1; }
 [ -f "$root/var/lib/cnftctl/delivery/SHA256SUMS" ] || { echo "installed checksum missing" >&2; exit 1; }
@@ -54,7 +69,7 @@ terminal=0123456789abcdef0123456789abcdef
 mkdir "$root/var/lib/cnftctl/transactions/$terminal"
 cp "$repo/packaging/testdata/transaction-confirmed-override.json" "$root/var/lib/cnftctl/transactions/$terminal/state.json"
 [ "$("$bundle/scripts/inspect-transaction" "$root/var/lib/cnftctl/transactions/$terminal")" = confirmed ] || { echo "override transaction was not accepted" >&2; exit 1; }
-CNFTCTL_INSTALL_ROOT="$root" CNFTCTL_BUNDLE_ARCH=amd64 CNFTCTL_TEST_SYSTEMD=1 CNFTCTL_SYSTEMCTL="$tmp/systemctl" CNFTCTL_SYSTEMCTL_LOG="$systemctl_log" "$bundle/install.sh" >/dev/null
+CNFTCTL_INSTALL_ROOT="$root" CNFTCTL_BUNDLE_ARCH="$arch" CNFTCTL_TEST_SYSTEMD=1 CNFTCTL_SYSTEMCTL="$tmp/systemctl" CNFTCTL_SYSTEMCTL_LOG="$systemctl_log" "$bundle/install.sh" >/dev/null
 cp "$tmp/cnftctl-native" "$root/usr/bin/cnftctl"
 rolled=abababababababababababababababab
 mkdir "$root/var/lib/cnftctl/transactions/$rolled"
@@ -63,13 +78,13 @@ sed -e "s/$terminal/$rolled/" -e 's/"phase": "confirmed"/"phase": "rolled-back"/
 pending=abcdef0123456789abcdef0123456789
 mkdir "$root/var/lib/cnftctl/transactions/$pending"
 printf '{"id":"%s","phase":"armed"}\n' "$pending" >"$root/var/lib/cnftctl/transactions/$pending/state.json"
-expect_fail env CNFTCTL_INSTALL_ROOT="$root" CNFTCTL_BUNDLE_ARCH=amd64 "$bundle/install.sh"
+expect_fail env CNFTCTL_INSTALL_ROOT="$root" CNFTCTL_BUNDLE_ARCH="$arch" "$bundle/install.sh"
 rm -rf "$root/var/lib/cnftctl/transactions/$pending"
 cp "$tmp/cnftctl-native" "$root/usr/bin/cnftctl"
 corrupt=11111111111111111111111111111111
 mkdir "$root/var/lib/cnftctl/transactions/$corrupt"
 printf '{\n' >"$root/var/lib/cnftctl/transactions/$corrupt/state.json"
-expect_fail env CNFTCTL_INSTALL_ROOT="$root" CNFTCTL_BUNDLE_ARCH=amd64 "$bundle/install.sh"
+expect_fail env CNFTCTL_INSTALL_ROOT="$root" CNFTCTL_BUNDLE_ARCH="$arch" "$bundle/install.sh"
 rm -rf "$root/var/lib/cnftctl/transactions/$corrupt"
 cp "$tmp/cnftctl-native" "$root/usr/bin/cnftctl"
 malformed=13131313131313131313131313131313
@@ -92,17 +107,17 @@ trailing=12121212121212121212121212121212
 mkdir "$root/var/lib/cnftctl/transactions/$trailing"
 sed "s/$terminal/$trailing/" "$root/var/lib/cnftctl/transactions/$terminal/state.json" >"$root/var/lib/cnftctl/transactions/$trailing/state.json"
 printf 'trailing garbage\n' >>"$root/var/lib/cnftctl/transactions/$trailing/state.json"
-expect_fail env CNFTCTL_INSTALL_ROOT="$root" CNFTCTL_BUNDLE_ARCH=amd64 "$bundle/install.sh"
+expect_fail env CNFTCTL_INSTALL_ROOT="$root" CNFTCTL_BUNDLE_ARCH="$arch" "$bundle/install.sh"
 rm -rf "$root/var/lib/cnftctl/transactions/$trailing"
 cp "$tmp/cnftctl-native" "$root/usr/bin/cnftctl"
 unsafe=22222222222222222222222222222222
 mkdir "$root/var/lib/cnftctl/transactions/$unsafe"
 ln -s /dev/null "$root/var/lib/cnftctl/transactions/$unsafe/state.json"
-expect_fail env CNFTCTL_INSTALL_ROOT="$root" CNFTCTL_BUNDLE_ARCH=amd64 "$bundle/install.sh"
+expect_fail env CNFTCTL_INSTALL_ROOT="$root" CNFTCTL_BUNDLE_ARCH="$arch" "$bundle/install.sh"
 rm -rf "$root/var/lib/cnftctl/transactions/$unsafe"
 cp "$tmp/cnftctl-native" "$root/usr/bin/cnftctl"
 oldsum=$(sha256sum "$root/usr/bin/cnftctl")
-expect_fail env CNFTCTL_INSTALL_ROOT="$root" CNFTCTL_BUNDLE_ARCH=amd64 CNFTCTL_TEST_SYSTEMD=1 CNFTCTL_SYSTEMCTL="$tmp/systemctl" CNFTCTL_SYSTEMCTL_LOG="$systemctl_log" CNFTCTL_SYSTEMCTL_FAIL=enable "$bundle/install.sh"
+expect_fail env CNFTCTL_INSTALL_ROOT="$root" CNFTCTL_BUNDLE_ARCH="$arch" CNFTCTL_TEST_SYSTEMD=1 CNFTCTL_SYSTEMCTL="$tmp/systemctl" CNFTCTL_SYSTEMCTL_LOG="$systemctl_log" CNFTCTL_SYSTEMCTL_FAIL=enable "$bundle/install.sh"
 [ "$(sha256sum "$root/usr/bin/cnftctl")" = "$oldsum" ] || { echo "failed install did not roll back assets" >&2; exit 1; }
 expect_fail env CNFTCTL_INSTALL_ROOT="$root" "$bundle/uninstall.sh" --unknown
 expect_fail env CNFTCTL_INSTALL_ROOT="$root" CNFTCTL_TEST_SYSTEMD=1 CNFTCTL_SYSTEMCTL="$tmp/systemctl" CNFTCTL_SYSTEMCTL_LOG="$systemctl_log" CNFTCTL_SYSTEMCTL_FAIL=disable "$bundle/uninstall.sh" --force-inactive

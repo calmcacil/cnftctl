@@ -2,7 +2,7 @@
 
 ## Scope And Invariants
 
-`cnftctl` exclusively owns and manages the app-owned `inet hostfw` nftables table on Debian 13 amd64. It does not manage arbitrary rules, Docker containers, DNS provider records, routing policy, or other nftables tables. An unknown pre-existing `inet hostfw` table is rejected; adoption is limited to the known reference layout. It never issues `flush ruleset`.
+`cnftctl` exclusively owns and manages the app-owned `inet hostfw` nftables table on Debian 13 amd64 and experimental arm64. It does not manage arbitrary rules, Docker containers, DNS provider records, routing policy, or other nftables tables. An unknown pre-existing `inet hostfw` table is rejected; adoption is limited to the known reference layout. It never issues `flush ruleset`.
 
 The policy provides default-deny host input, loopback and established/related acceptance, required ICMP/ICMPv6 behavior, WAN reverse-path filtering, explicit public ports, three SSH exposure modes, optional trusted interfaces, optional DDNS SSH sources, and optional strict Docker WAN gating.
 
@@ -78,13 +78,13 @@ Exit `0` means success/healthy, `1` means an inspection emitted usable unhealthy
 
 ## Installation Boundary
 
-The canonical artifact is `cnftctl_VERSION_amd64.deb`, a native Debian 13 amd64 package. Its verifier checks package metadata, closed inventory, manifest identity, target metadata, version, modes, and installed checksums. Installation places the executable, fixed systemd units, integrity inventory, documentation, and recovery assets, reloads systemd, and enables only reconciliation without activating firewall policy. Upgrade and removal are blocked while transaction history is unresolved or unsafe, and removal additionally checks for active `inet hostfw`. Removal and purge preserve operator configuration, immutable generations, and transaction audit state.
+Release artifacts are native Debian 13 packages named `cnftctl_VERSION_ARCH.deb` for `amd64` and `arm64`. Builders and verifiers require an explicit supported architecture; control metadata, manifest, pre-install guard, and ELF machine must agree. Installation places the executable, fixed systemd units, integrity inventory, documentation, and recovery assets, reloads systemd, and enables only reconciliation without activating firewall policy. Arm64 installation emits an experimental-risk warning. Upgrade and removal are blocked while transaction history is unresolved or unsafe, and removal additionally checks for active `inet hostfw`. Removal and purge preserve operator configuration, immutable generations, and transaction audit state.
 
-This section states the approved architecture contract, not release evidence. A version is supported only after its exact package passes the Debian 13 amd64 checks and evidence gate in `docs/manual-validation.md`; code changes alone do not satisfy that gate.
+This section states the approved architecture contract, not release evidence. A version is production-supported only after its exact amd64 package passes the Debian 13 amd64 evidence gate in `docs/manual-validation.md`; code changes and native CI alone do not satisfy that gate. Arm64 is experimental until an exact package completes the same full live checklist on a suitable disposable arm64 host.
 
 ## Non-Goals
 
-- Support beyond Debian 13 amd64.
+- Production support beyond Debian 13 amd64; arm64 is experimental only.
 - Arbitrary nftables management or deletion of foreign tables.
 - Automatic Docker restart or container management.
 - DNS-provider mutation.

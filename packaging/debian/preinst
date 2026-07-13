@@ -93,7 +93,8 @@ case ${1:-} in
 esac
 
 arch=${CNFTCTL_DPKG_ARCH:-$(dpkg --print-architecture)}
-[ "$arch" = amd64 ] || fail "Debian amd64 is required"
+package_arch=@ARCH@
+[ "$arch" = "$package_arch" ] || fail "Debian $package_arch is required"
 os_release=${CNFTCTL_OS_RELEASE:-$(dest /etc/os-release)}
 [ -f "$os_release" ] || fail "Debian 13 platform identity is unavailable"
 # Required platform file on the target.
@@ -101,6 +102,9 @@ os_release=${CNFTCTL_OS_RELEASE:-$(dest /etc/os-release)}
 . "$os_release"
 [ "${ID:-}" = debian ] || fail "Debian is required"
 [ "${VERSION_ID:-}" = 13 ] || fail "Debian 13 is required"
+if [ "$package_arch" = arm64 ]; then
+    echo "WARNING: cnftctl arm64 support is EXPERIMENTAL and unvalidated on a disposable live host; use at your own risk." >&2
+fi
 
 transactions=$(dest /var/lib/cnftctl/transactions)
 [ ! -e "$transactions" ] || [ -d "$transactions" ] || fail "transaction history is unsafe"

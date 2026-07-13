@@ -30,7 +30,11 @@ trap cleanup EXIT HUP INT TERM
 
 [ -n "$root" ] || [ "$(id -u)" -eq 0 ] || fail "root privileges are required"
 "$bundle/scripts/verify-bundle" "$bundle"
-[ "${CNFTCTL_BUNDLE_ARCH:-$(dpkg --print-architecture)}" = amd64 ] || fail "Debian amd64 is required"
+arch=$(sed -n 's/^architecture=//p' "$bundle/manifest")
+[ "${CNFTCTL_BUNDLE_ARCH:-$(dpkg --print-architecture)}" = "$arch" ] || fail "Debian $arch is required"
+if [ "$arch" = arm64 ]; then
+    echo "WARNING: cnftctl arm64 support is EXPERIMENTAL and unvalidated on a disposable live host; use at your own risk." >&2
+fi
 if [ -z "$root" ]; then
     # Required platform file on the live target.
     # shellcheck disable=SC1091

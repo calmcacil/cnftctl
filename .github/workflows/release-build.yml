@@ -18,9 +18,18 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-once:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+  build-native:
+    name: build-native (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
     steps:
       - name: Checkout candidate commit
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -35,6 +44,7 @@ jobs:
         run: |
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           test -z "$(git status --short)"
+          test "$(dpkg --print-architecture)" = "${{ matrix.arch }}"
       - name: Check source
         run: |
           go mod verify
@@ -58,42 +68,69 @@ jobs:
           sudo env "PATH=$PATH" sh ./scripts/validate-staged.sh
       - name: Build Debian package once
         env:
+          ARCH: ${{ matrix.arch }}
           VERSION: ${{ inputs.version }}
         run: |
-          sh ./scripts/build-deb.sh "$VERSION" "cnftctl_${VERSION}_amd64.deb"
-          sh ./scripts/verify-deb.sh "cnftctl_${VERSION}_amd64.deb" "$VERSION"
-          lintian --fail-on error "cnftctl_${VERSION}_amd64.deb"
+          sh ./scripts/build-deb.sh "$VERSION" "$ARCH" "cnftctl_${VERSION}_${ARCH}.deb"
+          sh ./scripts/verify-deb.sh "cnftctl_${VERSION}_${ARCH}.deb" "$VERSION" "$ARCH"
+          lintian --fail-on error "cnftctl_${VERSION}_${ARCH}.deb"
+          mkdir package-root
+          dpkg-deb --extract "cnftctl_${VERSION}_${ARCH}.deb" package-root
+          test "$(package-root/usr/bin/cnftctl --version)" = "cnftctl $VERSION"
       - name: Generate SPDX SBOM
         env:
+          ARCH: ${{ matrix.arch }}
           VERSION: ${{ inputs.version }}
         run: |
           go install github.com/anchore/syft/cmd/syft@v1.27.1
           mkdir sbom-root
-          dpkg-deb --extract "cnftctl_${VERSION}_amd64.deb" sbom-root
+          dpkg-deb --extract "cnftctl_${VERSION}_${ARCH}.deb" sbom-root
           syft "dir:sbom-root" \
             --source-name cnftctl \
             --source-version "$VERSION" \
-            -o spdx-json=sbom.spdx.json
-      - name: Package and checksum candidate
-        env:
-          VERSION: ${{ inputs.version }}
-        run: sha256sum "cnftctl_${VERSION}_amd64.deb" sbom.spdx.json > release-checksums.txt
+            -o "spdx-json=sbom_${ARCH}.spdx.json"
       - name: Attest package provenance
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
-          subject-path: cnftctl_${{ inputs.version }}_amd64.deb
+          subject-path: cnftctl_${{ inputs.version }}_${{ matrix.arch }}.deb
       - name: Attest SBOM
         uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
         with:
-          subject-path: cnftctl_${{ inputs.version }}_amd64.deb
-          sbom-path: sbom.spdx.json
+          subject-path: cnftctl_${{ inputs.version }}_${{ matrix.arch }}.deb
+          sbom-path: sbom_${{ matrix.arch }}.spdx.json
+      - name: Upload architecture component
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cnftctl-${{ inputs.version }}-${{ matrix.arch }}
+          path: |
+            cnftctl_${{ inputs.version }}_${{ matrix.arch }}.deb
+            sbom_${{ matrix.arch }}.spdx.json
+          if-no-files-found: error
+          retention-days: 14
+
+  aggregate:
+    needs: build-native
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download unchanged architecture components
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: cnftctl-${{ inputs.version }}-*
+          merge-multiple: true
+          path: candidate
+      - name: Verify and checksum closed candidate
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          cd candidate
+          test "$(find . -type f -printf '%P\n' | LC_ALL=C sort)" = "$(printf '%s\n' "cnftctl_${VERSION}_amd64.deb" "cnftctl_${VERSION}_arm64.deb" sbom_amd64.spdx.json sbom_arm64.spdx.json | LC_ALL=C sort)"
+          find . -type f -printf '%P\n' | LC_ALL=C sort | xargs sha256sum >release-checksums.txt
+          test "$(wc -l <release-checksums.txt)" -eq 4
       - name: Upload immutable candidate
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: cnftctl-${{ inputs.version }}-candidate
-          path: |
-            cnftctl_${{ inputs.version }}_amd64.deb
-            release-checksums.txt
-            sbom.spdx.json
+          path: candidate/
           if-no-files-found: error
           retention-days: 14

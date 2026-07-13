@@ -14,7 +14,7 @@
 
 ## CI And Release
 - Active automation is defined by the files currently under `.github/workflows/`; do not infer workflow state from old documentation.
-- The supported delivery unit is the native Debian 13 amd64 package, never a standalone binary or the internal staging bundle. Exact-artifact evidence requirements are in `docs/release-process.md` and `docs/manual-validation.md`.
+- Delivery units are native Debian 13 packages for production-supported amd64 and experimental arm64, never standalone binaries or the internal staging bundle. Exact-artifact evidence requirements are in `docs/release-process.md` and `docs/manual-validation.md`.
 - Release automation must use least privilege, immutable third-party action pins, and no secret-bearing untrusted PR execution.
 - Versioning uses SemVer and commit messages use Conventional Commits by convention; commit-message lint enforcement is not required.
 - `.opencode/plans/` is ignored local planning state; do not rely on it being present for future clones.
@@ -28,7 +28,7 @@
 - Any open port is public WAN exposure for both host services and Docker-published services when Docker gating is enabled.
 - Docker daemon edits or restarts require explicit consent; Docker integration is opt-in.
 - DDNS hostnames are part of the SSH trust boundary. A records are exact IPv4 entries; AAAA records derive IPv6 prefixes, default `/56`, `/64` only for single-LAN trust.
-- The only supported production platform is Debian 13 amd64 with systemd and nftables. Do not broaden support claims without release evidence.
+- The only supported production platform is Debian 13 amd64 with systemd and nftables. Arm64 is published but experimental and must remain explicitly unvalidated/at-own-risk until an exact package completes the full live evidence gate. Do not broaden support claims without release evidence.
 - For hardened SSH, preserve current-session coverage checks and the explicit audited override; override must never disable rollback.
 - Presets are untrusted input: they may pre-fill config but must not bypass validation, risk explanation, local confirmation, or rollback.
 

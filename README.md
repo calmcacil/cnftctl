@@ -2,7 +2,9 @@
 
 > Install only a published Debian package whose checksum and GitHub attestation you have verified. See `docs/production-readiness.md` and `docs/validation-record-0.1.0.md` for current release evidence.
 
-`cnftctl` manages one application-owned nftables profile, `inet hostfw`, on Debian 13 amd64 hosts. It is not a general firewall manager. It keeps operator-edited desired configuration separate from immutable active generations and never uses `flush ruleset`, so unrelated nftables owners such as Docker can coexist.
+> **Personal-use and trust disclaimer:** This project was created primarily for personal use. Best efforts have been made to design, test, document, and validate it safely, but firewall software can cause loss of access or unintended network exposure. Each user is responsible for reviewing the source, release evidence, configuration, and operational safeguards and deciding whether they trust it for their own environment. Use it at your own risk; do not treat the existence of tests, published packages, or validation records as a substitute for your own assessment and recovery plan.
+
+`cnftctl` manages one application-owned nftables profile, `inet hostfw`, on Debian 13 hosts. It is not a general firewall manager. It keeps operator-edited desired configuration separate from immutable active generations and never uses `flush ruleset`, so unrelated nftables owners such as Docker can coexist.
 
 ## Support
 
@@ -13,7 +15,7 @@ The supported production target is exactly:
 - Root for installation and active-policy operations.
 - Docker only when its strict WAN gate is explicitly enabled.
 
-Other distributions, releases, architectures, init systems, and nftables versions are untested and reported as unsupported. See `docs/support-matrix.md`.
+Debian 13 `arm64` packages are also published, but they are experimental, unvalidated on a disposable live host, not production-supported, and used at the operator's own risk. Other distributions, releases, architectures, init systems, and nftables versions are reported as unsupported. See `docs/support-matrix.md`.
 
 A release is supported only after its exact Debian package completes the evidence gate in `docs/manual-validation.md` and `docs/release-process.md`. Source checks or results from a different package are not substitutes.
 
@@ -33,15 +35,25 @@ An expired first-install transaction deletes only `inet hostfw`. A later expired
 
 ## Install A Release Package
 
-Download `cnftctl_VERSION_amd64.deb` and the accompanying `release-checksums.txt` from the same GitHub release. Verify the checksum and GitHub attestation before installation:
+Download the package, matching architecture-named SBOM, and `release-checksums.txt` from the same GitHub release. For production-supported amd64:
 
 ```sh
-sha256sum --check release-checksums.txt
+sha256sum --ignore-missing --check release-checksums.txt
 gh attestation verify cnftctl_VERSION_amd64.deb --repo calmcacil/cnftctl
 sudo apt install ./cnftctl_VERSION_amd64.deb
 ```
 
-The package enforces Debian 13 amd64, installs the binary, recovery helper, integrity inventory, documentation, and systemd units, and enables only boot reconciliation. It does not activate firewall policy, enable DDNS, or restart Docker. Package upgrades and removals refuse unresolved transaction state; removal also refuses while `inet hostfw` is active. Both `apt remove` and `apt purge` preserve `/etc/cnftctl` and `/var/lib/cnftctl`.
+The matching SBOM is `sbom_amd64.spdx.json`. For experimental arm64:
+
+```sh
+sha256sum --ignore-missing --check release-checksums.txt
+gh attestation verify cnftctl_VERSION_arm64.deb --repo calmcacil/cnftctl
+sudo apt install ./cnftctl_VERSION_arm64.deb
+```
+
+The matching SBOM is `sbom_arm64.spdx.json`, and installation emits an explicit experimental-risk warning. Do not mix package and SBOM architectures.
+
+Each package enforces Debian 13 and its matching architecture, installs the binary, recovery helper, integrity inventory, documentation, and systemd units, and enables only boot reconciliation. It does not activate firewall policy, enable DDNS, or restart Docker. Package upgrades and removals refuse unresolved transaction state; removal also refuses while `inet hostfw` is active. Both `apt remove` and `apt purge` preserve `/etc/cnftctl` and `/var/lib/cnftctl`.
 
 ## First Policy
 
@@ -109,7 +121,8 @@ Use `journalctl -u cnftctl-firewall.service`, `journalctl -u cnftctl-reconcile.s
 ```sh
 sh ./scripts/check.sh
 go build -o ./bin/cnftctl ./cmd/cnftctl
-sh ./scripts/build-deb.sh 0.1.0 ./cnftctl_0.1.0_amd64.deb
+sh ./scripts/build-deb.sh 0.1.0 amd64 ./cnftctl_0.1.0_amd64.deb
+sh ./scripts/build-deb.sh 0.1.0 arm64 ./cnftctl_0.1.0_arm64.deb
 ```
 
 The bundle builder and reference files remain internal staging and sanitized behavior baselines, not supported installation paths. Contribution terms are in `CONTRIBUTING.md`, vulnerability reporting is in `SECURITY.md`, and third-party attribution is in `THIRD_PARTY_NOTICES.md`.

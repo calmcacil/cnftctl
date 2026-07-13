@@ -19,6 +19,11 @@ firewall validation is `NOT EXERCISED`. This document's checked items remain
 the historical v0.1.0 amd64 record; they do not pre-approve a later package.
 Every later amd64 candidate must complete the exact-artifact gate again.
 
+The exact v0.2.0 amd64 candidate completed that repeated gate on 2026-07-13.
+Its immutable identity and results are recorded in
+`docs/validation-record-0.2.0.md`; tagging and promotion are pending. Arm64
+remains experimental and its live firewall checklist remains `NOT EXERCISED`.
+
 The evidence PR lands after the build-once candidate and therefore advances
 `main`. The `v0.1.0` tag must still point to recorded candidate commit
 `ee7ab0fd6932bafe1c22b684ec72e27e50803f94`; the promotion workflow explicitly

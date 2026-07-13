@@ -1,58 +1,65 @@
-# Release Notes And Evidence: v0.1.0
+# Release Notes And Evidence: v0.2.0
 
 ## Identity
 
-- Version/tag: `v0.1.0`
-- Commit: `ee7ab0fd6932bafe1c22b684ec72e27e50803f94`
-- Artifact: `cnftctl_0.1.0_amd64.deb` (`1712440` bytes)
-- Artifact SHA-256: `93966559a326522a984cc8dcd36a062d5f4931a8c51cacecdc847664b277b198`
-- CI run: [Release Candidate Build 29282503578](https://github.com/calmcacil/cnftctl/actions/runs/29282503578)
-- Promotion run: [29287049593](https://github.com/calmcacil/cnftctl/actions/runs/29287049593)
-- Release: [v0.1.0](https://github.com/calmcacil/cnftctl/releases/tag/v0.1.0)
+- Version/tag: `v0.2.0`
+- Candidate commit: `a2df7e38f77dba3b4dc236f7c3818c0b37749804`
+- amd64 package: `cnftctl_0.2.0_amd64.deb` (`1713732` bytes)
+- amd64 SHA-256: `58115490c323bfcee8929774f41be05eafce7b079d32f4b1099c9603258b80d0`
+- arm64 package: `cnftctl_0.2.0_arm64.deb` (`1455656` bytes)
+- arm64 SHA-256: `52144c150dfadb5faa78c97f27f4e52bc0fb7ae38c1c3338a6c9b41397d037af`
+- Candidate run: [29291333684](https://github.com/calmcacil/cnftctl/actions/runs/29291333684)
 - Tester and UTC date: project owner/Codex, 2026-07-13
 
-## Scope
+## Highlights
 
-This release provides the narrow `inet hostfw` manager for Debian 13 amd64, including desired YAML configuration, immutable generations, dedicated systemd activation, mandatory dead-man rollback and boot reconciliation, SSH session coverage checks with audited override, optional DDNS SSH sets, and optional strict Docker WAN gating.
+- Native Debian 13 packages are published for amd64 and arm64.
+- amd64 remains production-supported and completed the full exact-package live
+  activation, rollback, reboot/recovery, DDNS, Docker, upgrade, and uninstall
+  checklist.
+- arm64 is explicitly experimental, unvalidated on a disposable live host,
+  unsupported for production/security purposes, and used at the operator's
+  own risk.
+- Package metadata, installed manifests, pre-install guards, and ELF binaries
+  are architecture-specific and accept only amd64 or arm64.
+- CI and candidate builds run on native GitHub-hosted runners for both
+  architectures.
+- Each package has an architecture-named SPDX SBOM and matching GitHub
+  provenance/SBOM attestations.
+- Promotion verifies the closed five-file inventory and publishes unchanged
+  candidate bytes without rebuilding.
+- Runtime reporting distinguishes production amd64 from experimental arm64
+  through structured support-tier details.
+- The README now carries a prominent personal-use and operator-trust
+  disclaimer.
 
-The supported installation unit is the verified Debian package. Installation enables only reconciliation and does not activate firewall policy, enable DDNS, or restart Docker.
+Firewall rendering, nftables policy, systemd units, rollback semantics,
+transaction logic, and Docker/DDNS behavior are unchanged by the architecture
+expansion.
 
 ## Compatibility And Limitations
 
-- Supported only on Debian 13 amd64 with systemd and nftables.
-- Not a general nftables manager; foreign tables remain outside project ownership.
-- Docker support gates published traffic but does not configure containers or restart Docker.
-- DDNS trusts configured DNS results and supports only `/56` or `/64` IPv6 derivation.
-- `doctor` currently performs the same checks as `status`.
-- The rollback timeout is fixed at 120 seconds.
-- Manual reference deployment and the internal bundle are behavior/build references, not supported installation paths.
-- `transactions list` reports pending transactions, not historical completed transactions.
-- Docker external IPv6 traffic was not exercised; generated IPv6 rules passed exact nftables syntax validation.
-- Debian Docker 26 rejects the proposed `firewall-backend` directive, so a supported backend write was not exercised and no daemon file was changed.
-- Provider KVM login was confirmed and provides a shell independent of SSH and nftables. Operators without provider console/rescue access necessarily depend on rollback completing successfully.
+- Production support remains exactly Debian 13 amd64 with systemd and nftables.
+- Debian 13 arm64 packages are experimental and carry no production or
+  security-support guarantee.
+- Docker external IPv6 traffic remains `NOT EXERCISED`; generated IPv6 rules
+  pass exact nftables syntax validation.
+- Debian Docker 26 rejects the proposed `firewall-backend` directive, so no
+  daemon configuration was written or restarted during validation.
+- The project remains a narrow manager for the application-owned `inet hostfw`
+  table, not a general firewall manager.
 
 ## Evidence
 
-- CI checks: `PASS`; candidate run linked above.
-- Offline package verification, reproducibility, and lintian: `PASS`.
-- First-install timeout/table deletion: `PASS`.
-- Confirm and prior-generation rollback: `PASS`.
-- Initiating-session death and reboot reconciliation: `PASS`.
-- SSH override audit: `PASS`.
-- DDNS refresh, expiry/freshness, and timer reconciliation: `PASS`.
-- Foreign nftables and Docker table coexistence: `PASS`.
-- Strict Docker IPv4 WAN gate: `PASS`; external IPv6 `NOT EXERCISED`.
-- Fresh install, active reinstall, purge-preserved reinstall, upgrade, and uninstall: `PASS`.
-- Corrupt preserved-state refusal before unpack: `PASS`.
-- JSON schema and exit codes: `PASS`.
-- Security, vulnerability, license, notice, and sanitization review: `PASS`.
-- SBOM and build provenance: `PASS`; two attestations refer to the exact package digest.
-- Provider KVM recovery path: `PASS`; recorded in release evidence issue #8.
-- Build-once promotion: `PASS`; the published package is byte-identical to candidate run `29282503578`.
-- Public-download checksum, provenance, package, clean-state install/version, and removal verification: `PASS`.
+- Native amd64 and arm64 automated gates: `PASS`.
+- Offline verification, reproducibility, lifecycle tests, lintian, SBOMs, and
+  attestations: `PASS`.
+- Exact amd64 HOST_A/HOST_B validation: `PASS`.
+- Docker IPv4 external WAN gate and coexistence: `PASS`.
+- Docker IPv6 external traffic: `NOT EXERCISED`.
+- Live arm64 firewall validation: `NOT EXERCISED`.
+- Publication and public-download verification: pending tag/promotion.
 
-Detailed results and readiness status are in `docs/validation-record-0.1.0.md`
-and `docs/production-readiness.md`. Retained raw command output and journals
-and final public-download results are indexed in release evidence issue #8,
-with sensitive infrastructure values excluded under the repository
-sanitization policy.
+Detailed sanitized evidence is in `docs/validation-record-0.2.0.md` and release
+evidence issue #18. Raw host logs and archived audit state are retained
+privately; credentials, hostnames, addresses, and trust values are excluded.

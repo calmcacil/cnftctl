@@ -100,4 +100,24 @@ CNFTCTL_MAINT_ROOT="$root" CNFTCTL_POLICY_INACTIVE=1 CNFTCTL_SYSTEMCTL="$tmp/sys
 CNFTCTL_SYSTEMCTL="$tmp/systemctl" CNFTCTL_SYSTEMCTL_LOG="$systemctl_log" "$control/postrm" remove >/dev/null
 [ -f "$transactions/$terminal/state.json" ] || { echo "audit state was removed" >&2; exit 1; }
 
+# dpkg removes package-owned helpers while preserving operator and audit state.
+# A later install must validate that state before the incoming payload exists.
+rm "$root/usr/lib/cnftctl/inspect-transaction"
+CNFTCTL_MAINT_ROOT="$root" CNFTCTL_DPKG_ARCH=amd64 CNFTCTL_OS_RELEASE="$root/etc-os-release" "$control/preinst" install
+cp "$transactions/$terminal/state.json" "$tmp/terminal-state.json"
+printf '{broken}\n' >"$transactions/$terminal/state.json"
+expect_fail env CNFTCTL_MAINT_ROOT="$root" CNFTCTL_DPKG_ARCH=amd64 CNFTCTL_OS_RELEASE="$root/etc-os-release" "$control/preinst" install
+cp "$tmp/terminal-state.json" "$transactions/$terminal/state.json"
+printf '{}\n' >>"$transactions/$terminal/state.json"
+expect_fail env CNFTCTL_MAINT_ROOT="$root" CNFTCTL_DPKG_ARCH=amd64 CNFTCTL_OS_RELEASE="$root/etc-os-release" "$control/preinst" install
+cp "$tmp/terminal-state.json" "$transactions/$terminal/state.json"
+mv "$transactions/$terminal/state.json" "$transactions/$terminal/state.real"
+ln -s state.real "$transactions/$terminal/state.json"
+expect_fail env CNFTCTL_MAINT_ROOT="$root" CNFTCTL_DPKG_ARCH=amd64 CNFTCTL_OS_RELEASE="$root/etc-os-release" "$control/preinst" install
+rm "$transactions/$terminal/state.json"
+mv "$transactions/$terminal/state.real" "$transactions/$terminal/state.json"
+mkdir "$transactions/$pending"
+printf '{"id":"%s","phase":"armed"}\n' "$pending" >"$transactions/$pending/state.json"
+expect_fail env CNFTCTL_MAINT_ROOT="$root" CNFTCTL_DPKG_ARCH=amd64 CNFTCTL_OS_RELEASE="$root/etc-os-release" "$control/preinst" install
+
 echo "Debian package lifecycle tests passed"

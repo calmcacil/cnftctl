@@ -59,7 +59,7 @@ jobs:
           test -z "$(find . -mindepth 1 -maxdepth 1 ! -type f -print -quit)"
           sha256sum --check release-checksums.txt
           test "$(wc -l <release-checksums.txt)" -eq 2
-          gh attestation verify "cnftctl_${VERSION}_amd64.deb" --repo "$GITHUB_REPOSITORY" --signer-workflow "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/workflows/release-build.yml@refs/heads/main"
+          gh attestation verify "cnftctl_${VERSION}_amd64.deb" --repo "$GITHUB_REPOSITORY" --signer-workflow "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/.github/workflows/release-build.yml@refs/heads/main"
           cd ..
           sh ./scripts/verify-deb.sh "candidate/cnftctl_${VERSION}_amd64.deb" "$VERSION"
       - name: Publish verified release

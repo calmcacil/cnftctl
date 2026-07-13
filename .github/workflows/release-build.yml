@@ -55,7 +55,7 @@ jobs:
           actionlint .github/workflows/*.yml
           shellcheck scripts/*.sh packaging/*.sh packaging/bundle/*.sh packaging/bundle/scripts/*
           sh ./scripts/verify-delivery-assets.sh
-          sh ./scripts/validate-staged.sh
+          sudo env "PATH=$PATH" sh ./scripts/validate-staged.sh
       - name: Build bundle once
         env:
           VERSION: ${{ inputs.version }}

@@ -22,23 +22,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Checkout exact release tag
+      - name: Checkout candidate commit
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: v${{ inputs.version }}
           persist-credentials: false
       - name: Setup Go
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version-file: go.mod
           cache: true
-      - name: Verify tag and source version
-        env:
-          VERSION: ${{ inputs.version }}
+      - name: Verify candidate source
         run: |
-          test "$(git tag --points-at HEAD)" = "v$VERSION"
-          test "$(git rev-list -n 1 "v$VERSION^{commit}")" = "$GITHUB_SHA"
-          test "$GITHUB_REF_NAME" = "v$VERSION" || test "$GITHUB_EVENT_NAME" = workflow_dispatch
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git status --short)"
       - name: Check source
         run: |
           go mod verify

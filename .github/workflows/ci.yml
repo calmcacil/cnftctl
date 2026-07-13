@@ -25,7 +25,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
         with:
-          go-version-file: go.mod
+          go-version-file: .go-version
           cache: true
 
       - name: Run checks
@@ -46,7 +46,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
         with:
-          go-version-file: go.mod
+          go-version-file: .go-version
           cache: true
       - name: Install pinned analyzers
         run: |
@@ -67,7 +67,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
         with:
-          go-version-file: go.mod
+          go-version-file: .go-version
           cache: true
       - name: Install shell and workflow linters
         run: |
@@ -97,7 +97,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
         with:
-          go-version-file: go.mod
+          go-version-file: .go-version
           cache: true
       - name: Validate staged nftables syntax
         run: sh ./scripts/validate-staged.sh

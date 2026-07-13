@@ -2,6 +2,8 @@
 set -eu
 
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+go_version=$(cat "$root/.go-version")
+[ "toolchain go$go_version" = "$(grep '^toolchain go' "$root/go.mod")" ] || { echo ".go-version and go.mod toolchain differ" >&2; exit 1; }
 command -v systemd-analyze >/dev/null 2>&1 || { echo "systemd-analyze is required" >&2; exit 1; }
 for script in "$root/scripts/check.sh" "$root/scripts/build-bundle.sh" "$root/scripts/validate-staged.sh" "$root/scripts/verify-delivery-assets.sh" "$root/packaging/test-bundle.sh" "$root/packaging/bundle/install.sh" "$root/packaging/bundle/uninstall.sh" "$root/packaging/bundle/scripts/cnftctl-recover" "$root/packaging/bundle/scripts/inspect-transaction" "$root/packaging/bundle/scripts/verify-bundle"; do
     sh -n "$script"

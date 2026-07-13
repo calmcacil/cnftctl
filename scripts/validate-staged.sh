@@ -12,7 +12,7 @@ root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 [ -f "$root/go.mod" ] || { echo "repository root not found" >&2; exit 1; }
 
 mkdir -p "$tmp/root"
-go build -o "$tmp/cnftctl" "$root/cmd/cnftctl"
+go build -buildvcs=false -o "$tmp/cnftctl" "$root/cmd/cnftctl"
 "$tmp/cnftctl" init --root "$tmp/root" --wan-interface eth0 --yes >/dev/null
 command -v nft >/dev/null 2>&1 || { echo "nft is required for staged validation" >&2; exit 1; }
 if nft list tables >/dev/null 2>&1; then

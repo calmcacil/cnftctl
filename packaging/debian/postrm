@@ -5,9 +5,8 @@ systemctl_cmd=${CNFTCTL_SYSTEMCTL:-systemctl}
 case ${1:-} in
     remove|purge)
         "$systemctl_cmd" daemon-reload
+        echo "cnftctl delivery assets removed; configuration and audit state were preserved"
         ;;
     upgrade|failed-upgrade|abort-install|abort-upgrade|disappear) ;;
     *) echo "cnftctl post-removal: unsupported dpkg action ${1:-missing}" >&2; exit 1 ;;
 esac
-
-echo "cnftctl delivery assets removed; configuration and audit state were preserved"

@@ -79,6 +79,14 @@ terminal=0123456789abcdef0123456789abcdef
 mkdir -p "$transactions/$terminal"
 cp "$repo/packaging/testdata/transaction-confirmed-override.json" "$transactions/$terminal/state.json"
 CNFTCTL_MAINT_ROOT="$root" CNFTCTL_DPKG_ARCH=amd64 CNFTCTL_OS_RELEASE="$root/etc-os-release" "$control/preinst" upgrade 0.0.0~old
+[ -z "$(CNFTCTL_SYSTEMCTL="$tmp/systemctl" CNFTCTL_SYSTEMCTL_LOG="$systemctl_log" "$control/postrm" upgrade 0.0.0~old)" ] || {
+    echo "package upgrade reported a removal" >&2
+    exit 1
+}
+[ -z "$(CNFTCTL_SYSTEMCTL="$tmp/systemctl" CNFTCTL_SYSTEMCTL_LOG="$systemctl_log" "$control/postinst" abort-remove)" ] || {
+    echo "aborted removal reported an installation" >&2
+    exit 1
+}
 
 pending=abcdef0123456789abcdef0123456789
 mkdir "$transactions/$pending"

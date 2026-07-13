@@ -80,6 +80,7 @@ add() {
 }
 add "$bundle/bin/cnftctl" /usr/bin/cnftctl 0755
 add "$bundle/scripts/cnftctl-recover" /usr/lib/cnftctl/cnftctl-recover 0755
+add "$bundle/scripts/inspect-transaction" /usr/lib/cnftctl/inspect-transaction 0755
 for unit in "$bundle"/systemd/*; do add "$unit" "/usr/lib/systemd/system/${unit##*/}" 0644; done
 add "$bundle/manifest" /var/lib/cnftctl/delivery/manifest 0644
 add "$bundle/SHA256SUMS" /var/lib/cnftctl/delivery/SHA256SUMS 0644

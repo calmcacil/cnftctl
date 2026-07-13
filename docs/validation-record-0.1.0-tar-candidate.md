@@ -1,4 +1,6 @@
-# Release Validation Record: 0.1.0 Candidate
+# Historical Release Validation Record: 0.1.0 Tar Candidate
+
+This record covers the superseded tar candidate only. It remains engineering evidence but is not evidence for the canonical Debian package and cannot authorize `v0.1.0` publication.
 
 This is the sanitized validation record for the immutable GitHub Actions
 candidate identified below. HOST_A and HOST_B were two consecutive clean

@@ -43,53 +43,56 @@ jobs:
           go test -race -count=1 ./...
       - name: Install pinned release analyzers
         run: |
-          go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
-          go install honnef.co/go/tools/cmd/staticcheck@2025.1.1
+          GOTOOLCHAIN=local go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
+          GOTOOLCHAIN=local go install honnef.co/go/tools/cmd/staticcheck@v0.8.0-rc.1
           go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
           sudo apt-get update
-          sudo apt-get install --yes nftables shellcheck
+          sudo apt-get install --yes lintian nftables shellcheck
       - name: Run release analysis and delivery checks
         run: |
           govulncheck ./...
           staticcheck -checks=all,-S1016,-ST1000,-U1000 ./...
           actionlint .github/workflows/*.yml
-          shellcheck scripts/*.sh packaging/*.sh packaging/bundle/*.sh packaging/bundle/scripts/*
+          shellcheck scripts/*.sh packaging/*.sh packaging/bundle/*.sh packaging/bundle/scripts/* packaging/debian/preinst packaging/debian/postinst packaging/debian/prerm packaging/debian/postrm
           sh ./scripts/verify-delivery-assets.sh
           sudo env "PATH=$PATH" sh ./scripts/validate-staged.sh
-      - name: Build bundle once
+      - name: Build Debian package once
         env:
           VERSION: ${{ inputs.version }}
-        run: sh ./scripts/build-bundle.sh "$VERSION" "dist/cnftctl-$VERSION-debian13-amd64"
+        run: |
+          sh ./scripts/build-deb.sh "$VERSION" "cnftctl_${VERSION}_amd64.deb"
+          sh ./scripts/verify-deb.sh "cnftctl_${VERSION}_amd64.deb" "$VERSION"
+          lintian --fail-on error "cnftctl_${VERSION}_amd64.deb"
       - name: Generate SPDX SBOM
         env:
           VERSION: ${{ inputs.version }}
         run: |
           go install github.com/anchore/syft/cmd/syft@v1.27.1
-          syft "dir:dist/cnftctl-$VERSION-debian13-amd64" \
+          mkdir sbom-root
+          dpkg-deb --extract "cnftctl_${VERSION}_amd64.deb" sbom-root
+          syft "dir:sbom-root" \
             --source-name cnftctl \
             --source-version "$VERSION" \
             -o spdx-json=sbom.spdx.json
       - name: Package and checksum candidate
         env:
           VERSION: ${{ inputs.version }}
-        run: |
-          tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner -C dist -czf "cnftctl-$VERSION-debian13-amd64.tar.gz" "cnftctl-$VERSION-debian13-amd64"
-          sha256sum "cnftctl-$VERSION-debian13-amd64.tar.gz" sbom.spdx.json > release-checksums.txt
-      - name: Attest bundle provenance
+        run: sha256sum "cnftctl_${VERSION}_amd64.deb" sbom.spdx.json > release-checksums.txt
+      - name: Attest package provenance
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
-          subject-path: cnftctl-${{ inputs.version }}-debian13-amd64.tar.gz
+          subject-path: cnftctl_${{ inputs.version }}_amd64.deb
       - name: Attest SBOM
         uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
         with:
-          subject-path: cnftctl-${{ inputs.version }}-debian13-amd64.tar.gz
+          subject-path: cnftctl_${{ inputs.version }}_amd64.deb
           sbom-path: sbom.spdx.json
       - name: Upload immutable candidate
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: cnftctl-${{ inputs.version }}-candidate
           path: |
-            cnftctl-${{ inputs.version }}-debian13-amd64.tar.gz
+            cnftctl_${{ inputs.version }}_amd64.deb
             release-checksums.txt
             sbom.spdx.json
           if-no-files-found: error

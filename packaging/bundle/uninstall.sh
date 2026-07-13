@@ -56,7 +56,7 @@ if [ -z "$root" ] || [ "${CNFTCTL_TEST_SYSTEMD:-0}" = 1 ]; then
         "$systemctl_cmd" is-enabled --quiet "$unit" && fail "failed to disable $unit"
     done
 fi
-rm -f "$binary" "$(dest /usr/lib/cnftctl/cnftctl-recover)"
+rm -f "$binary" "$(dest /usr/lib/cnftctl/cnftctl-recover)" "$(dest /usr/lib/cnftctl/inspect-transaction)"
 for name in cnftctl-rollback@.service cnftctl-rollback@.timer cnftctl-reconcile.service cnftctl-firewall.service cnftctl-ddns-refresh.service cnftctl-ddns-refresh.timer; do rm -f "$(dest /usr/lib/systemd/system/$name)"; done
 rm -rf "$(dest /var/lib/cnftctl/delivery)" "$(dest /usr/share/doc/cnftctl)"
 if [ -z "$root" ] || [ "${CNFTCTL_TEST_SYSTEMD:-0}" = 1 ]; then

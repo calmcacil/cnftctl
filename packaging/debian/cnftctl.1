@@ -1,0 +1,33 @@
+.TH CNFTCTL 1 "July 2026" "cnftctl" "System Administration"
+.SH NAME
+cnftctl \- guarded nftables host firewall manager
+.SH SYNOPSIS
+.B cnftctl
+.RI [ global-options ]
+.I command
+.RI [ command-options ]
+.SH DESCRIPTION
+.B cnftctl
+manages the application-owned
+.B inet hostfw
+nftables profile on Debian 13 amd64. Desired configuration is separate from
+immutable active generations. Every live policy change arms a systemd-owned
+rollback and requires explicit confirmation.
+.SH SAFETY
+Arrange tested console or rescue access before applying remote firewall
+changes. The rollback timeout cannot be bypassed. Docker integration and
+trusted interfaces are disabled by default.
+.SH FILES
+.TP
+.I /etc/cnftctl/config.yaml
+Mutable desired configuration.
+.TP
+.I /var/lib/cnftctl
+Immutable generations, transaction audit state, and active selection.
+.TP
+.I /usr/share/doc/cnftctl/operator-guide.md
+Complete operating instructions.
+.SH SEE ALSO
+.BR nft (8),
+.BR systemctl (1),
+.BR journalctl (1)

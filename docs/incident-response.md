@@ -71,7 +71,7 @@ There is no normal CLI command that deactivates a confirmed policy. If uninstall
 
 ```sh
 sudo nft delete table inet hostfw
-sudo ./uninstall.sh
+sudo apt remove cnftctl
 ```
 
 This is an incident/retirement operation, not a rollback bypass. It removes only the app-owned table. Preserve `/etc/cnftctl` and `/var/lib/cnftctl` until retention and forensic requirements are satisfied.

@@ -863,6 +863,7 @@ func TestVerifyInstalledAssetsStrictInventory(t *testing.T) {
 	files := map[string][]byte{
 		"/usr/bin/cnftctl":                                     []byte("binary"),
 		"/usr/lib/cnftctl/cnftctl-recover":                     []byte("recover"),
+		"/usr/lib/cnftctl/inspect-transaction":                 []byte("inspect"),
 		"/usr/lib/systemd/system/cnftctl-firewall.service":     []byte("ExecStart=/usr/sbin/nft -I /var/lib/cnftctl/active -f /var/lib/cnftctl/active/firewall.nft\n"),
 		"/usr/lib/systemd/system/cnftctl-reconcile.service":    []byte("ExecStart=/usr/bin/cnftctl reconcile\n"),
 		"/usr/lib/systemd/system/cnftctl-rollback@.service":    []byte("ExecStart=/usr/bin/cnftctl rollback %i\n"),
@@ -871,7 +872,7 @@ func TestVerifyInstalledAssetsStrictInventory(t *testing.T) {
 		"/usr/lib/systemd/system/cnftctl-ddns-refresh.timer":   []byte("timer"),
 		"/var/lib/cnftctl/delivery/manifest":                   []byte("format=1\nproduct=cnftctl\n"),
 	}
-	mapping := map[string]string{"/usr/bin/cnftctl": "bin/cnftctl", "/usr/lib/cnftctl/cnftctl-recover": "scripts/cnftctl-recover", "/var/lib/cnftctl/delivery/manifest": "manifest"}
+	mapping := map[string]string{"/usr/bin/cnftctl": "bin/cnftctl", "/usr/lib/cnftctl/cnftctl-recover": "scripts/cnftctl-recover", "/usr/lib/cnftctl/inspect-transaction": "scripts/inspect-transaction", "/var/lib/cnftctl/delivery/manifest": "manifest"}
 	var sums []string
 	for path, data := range files {
 		full := rooted(root, path)

@@ -3,7 +3,7 @@ set -eu
 
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 command -v systemd-analyze >/dev/null 2>&1 || { echo "systemd-analyze is required" >&2; exit 1; }
-for script in "$root/scripts/check.sh" "$root/scripts/build-bundle.sh" "$root/scripts/validate-staged.sh" "$root/scripts/verify-delivery-assets.sh" "$root/packaging/test-bundle.sh" "$root/packaging/bundle/install.sh" "$root/packaging/bundle/uninstall.sh" "$root/packaging/bundle/scripts/cnftctl-recover" "$root/packaging/bundle/scripts/inspect-transaction" "$root/packaging/bundle/scripts/verify-bundle"; do
+for script in "$root/scripts/check.sh" "$root/scripts/build-bundle.sh" "$root/scripts/build-deb.sh" "$root/scripts/verify-deb.sh" "$root/scripts/validate-staged.sh" "$root/scripts/verify-delivery-assets.sh" "$root/packaging/test-bundle.sh" "$root/packaging/test-deb.sh" "$root/packaging/bundle/install.sh" "$root/packaging/bundle/uninstall.sh" "$root/packaging/bundle/scripts/cnftctl-recover" "$root/packaging/bundle/scripts/inspect-transaction" "$root/packaging/bundle/scripts/verify-bundle" "$root"/packaging/debian/preinst "$root"/packaging/debian/postinst "$root"/packaging/debian/prerm "$root"/packaging/debian/postrm; do
     sh -n "$script"
 done
 
@@ -26,7 +26,7 @@ grep -q '^RemainAfterExit=yes$' "$root/deploy/systemd/cnftctl-reconcile.service"
 grep -q '^RuntimeDirectory=cnftctl$' "$root/deploy/systemd/cnftctl-reconcile.service"
 grep -q '^RuntimeDirectory=cnftctl$' "$root/deploy/systemd/cnftctl-rollback@.service"
 grep -q '^RuntimeDirectory=cnftctl$' "$root/deploy/systemd/cnftctl-ddns-refresh.service"
-if grep -Eq 'systemctl (enable|start|enable --now|start --no-block).*cnftctl-firewall' "$root/packaging/bundle/install.sh"; then
+if grep -Eq '(systemctl|systemctl_cmd).* (enable|start|enable --now|start --no-block).*cnftctl-firewall' "$root/packaging/bundle/install.sh" "$root/packaging/debian/postinst"; then
     echo "installer must not activate the firewall unit" >&2
     exit 1
 fi
@@ -36,6 +36,7 @@ grep -q 'name: Release Candidate Build$' "$root/.github/workflows/release-build.
 grep -q 'actions/workflows/release-build.yml@\$GITHUB_SHA' "$root/.github/workflows/release-promote.yml"
 # Match literal GitHub expression syntax.
 # shellcheck disable=SC2016
-grep -q 'cnftctl-${{ inputs.version }}-debian13-amd64.tar.gz' "$root/.github/workflows/release-build.yml"
+grep -q 'cnftctl_${{ inputs.version }}_amd64.deb' "$root/.github/workflows/release-build.yml"
 
 sh "$root/packaging/test-bundle.sh"
+sh "$root/packaging/test-deb.sh"

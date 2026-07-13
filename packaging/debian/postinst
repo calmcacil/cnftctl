@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+
+systemctl_cmd=${CNFTCTL_SYSTEMCTL:-systemctl}
+case ${1:-} in
+    configure)
+        "$systemctl_cmd" daemon-reload
+        "$systemctl_cmd" enable --now cnftctl-reconcile.service
+        "$systemctl_cmd" is-enabled --quiet cnftctl-reconcile.service
+        ;;
+    abort-upgrade|abort-remove|abort-deconfigure) ;;
+    *) echo "cnftctl post-install: unsupported dpkg action ${1:-missing}" >&2; exit 1 ;;
+esac
+
+echo "cnftctl installed; firewall policy and DDNS were not started"

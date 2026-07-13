@@ -1,6 +1,6 @@
 # cnftctl
 
-> Production status: **NOT READY** pending exact Debian 13 amd64 artifact validation. See `docs/production-readiness.md` for remaining work and `docs/validation-record.md` for the required evidence record.
+> Install only a published Debian package whose checksum and GitHub attestation you have verified. See `docs/production-readiness.md` and the versioned validation record for release evidence.
 
 `cnftctl` manages one application-owned nftables profile, `inet hostfw`, on Debian 13 amd64 hosts. It is not a general firewall manager. It keeps operator-edited desired configuration separate from immutable active generations and never uses `flush ruleset`, so unrelated nftables owners such as Docker can coexist.
 
@@ -15,7 +15,7 @@ The supported production target is exactly:
 
 Other distributions, releases, architectures, init systems, and nftables versions are untested and reported as unsupported. See `docs/support-matrix.md`.
 
-**Production status: NOT READY.** This repository documents the approved architecture contract, but no release is production-ready until the canonical Debian 13 amd64 artifact has the complete exact-artifact evidence required by `docs/manual-validation.md` and `docs/release-process.md`. Do not interpret implemented code or this documentation as evidence that those checks passed.
+A release is supported only after its exact Debian package completes the evidence gate in `docs/manual-validation.md` and `docs/release-process.md`. Source checks or results from a different package are not substitutes.
 
 ## Safety
 
@@ -31,18 +31,17 @@ Every non-dry-run `apply`:
 
 An expired first-install transaction deletes only `inet hostfw`. A later expired transaction restores the prior generation. The timer is independent of the invoking shell, and `cnftctl-reconcile.service` rolls back unconfirmed durable transactions after reboot. There is no supported rollback bypass and the timeout is fixed at 120 seconds.
 
-## Install A Release Bundle
+## Install A Release Package
 
-Use the complete release bundle, not a binary copied by itself. The bundle contains the binary, systemd units, manifest, checksums, installer, and uninstaller.
+Download `cnftctl_VERSION_amd64.deb` and the accompanying `release-checksums.txt` from the same GitHub release. Verify the checksum and GitHub attestation before installation:
 
 ```sh
-tar -xf cnftctl-VERSION-debian13-amd64.tar.gz
-cd cnftctl-VERSION-debian13-amd64
-./scripts/verify-bundle .
-sudo ./install.sh
+sha256sum --check release-checksums.txt
+gh attestation verify cnftctl_VERSION_amd64.deb --repo calmcacil/cnftctl
+sudo apt install ./cnftctl_VERSION_amd64.deb
 ```
 
-The installer contract verifies bundle checksums and the Debian 13 amd64 platform, installs `/usr/bin/cnftctl` and units under `/usr/lib/systemd/system`, and does not activate firewall policy. Guarded upgrade and uninstall are part of that contract. Production support remains withheld until these behaviors pass exact-artifact validation.
+The package enforces Debian 13 amd64, installs the binary, recovery helper, integrity inventory, documentation, and systemd units, and enables only boot reconciliation. It does not activate firewall policy, enable DDNS, or restart Docker. Package upgrades and removals refuse unresolved transaction state; removal also refuses while `inet hostfw` is active. Both `apt remove` and `apt purge` preserve `/etc/cnftctl` and `/var/lib/cnftctl`.
 
 ## First Policy
 
@@ -75,7 +74,21 @@ SSH is open from WAN by default to reduce first-install lockout risk. Hardened m
 
 Docker integration is disabled by default and is a strict WAN gate. When enabled, a Docker-published service is reachable from WAN only when its protocol and public port also appear in `open_ports`; that same entry exposes a matching host service. IPv4 DNAT uses the original destination port, while supported IPv6 DNAT/routed traffic is gated by destination port.
 
+Docker is not trusted merely because it is installed. Enabling the feature trusts host input arriving from `docker0` and `br-*`, leaves Docker's own container and bridge forwarding behavior intact, and adds only the narrow WAN-to-Docker gate. cnftctl never flushes or takes ownership of Docker's nftables tables.
+
 `cnftctl docker backend plan` previews setting Docker's `firewall-backend` to `nftables`. `cnftctl docker backend write --yes` preserves other daemon JSON keys and writes a timestamped backup. It never restarts Docker. A backend migration and Docker restart are disruptive and remain an explicit operator action.
+
+## Tailscale And Trusted Interfaces
+
+Tailscale is supported through the generic trusted-interface feature and is never enabled or discovered automatically:
+
+```sh
+sudo cnftctl feature enable trusted-interface --interface tailscale0
+sudo cnftctl apply
+sudo cnftctl confirm TRANSACTION_ID
+```
+
+Traffic arriving on `tailscale0` then receives full host-input trust, including SSH. Do not add the entire `100.64.0.0/10` CGNAT range to a WAN whitelist; Tailscale authentication and ACLs remain Tailscale's responsibility. Forwarded VPN trust is a separate explicit `trusted_interfaces.trust_forwarding` setting. UDP port 41641 may be added to `open_ports` for direct connectivity; DERP fallback works without it. cnftctl does not install Tailscale, configure tailnet ACLs, or advertise routes.
 
 ## Inspection And Automation
 
@@ -96,9 +109,10 @@ Use `journalctl -u cnftctl-firewall.service`, `journalctl -u cnftctl-reconcile.s
 ```sh
 sh ./scripts/check.sh
 go build -o ./bin/cnftctl ./cmd/cnftctl
+sh ./scripts/build-deb.sh 0.1.0 ./cnftctl_0.1.0_amd64.deb
 ```
 
-The reference files remain a sanitized behavior baseline, not the supported bundle installation path. Contribution terms are in `CONTRIBUTING.md`, vulnerability reporting is in `SECURITY.md`, and third-party attribution is in `THIRD_PARTY_NOTICES.md`.
+The bundle builder and reference files remain internal staging and sanitized behavior baselines, not supported installation paths. Contribution terms are in `CONTRIBUTING.md`, vulnerability reporting is in `SECURITY.md`, and third-party attribution is in `THIRD_PARTY_NOTICES.md`.
 
 ## Documentation
 

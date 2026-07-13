@@ -4,9 +4,9 @@ Releases use SemVer tags `vMAJOR.MINOR.PATCH` and Conventional Commits by conven
 
 ## Supported Artifact
 
-The canonical release artifact is exactly `cnftctl-VERSION-debian13-amd64.tar.gz`. A standalone binary is not a supported installation because apply verifies installed systemd and manifest assets.
+The canonical release artifact is exactly `cnftctl_VERSION_amd64.deb`. A standalone binary and the internal staging bundle are not supported installations because apply verifies package-installed systemd, recovery, manifest, and checksum assets.
 
-**Production status is NOT READY** until this exact artifact completes the evidence gate below on Debian 13 amd64. The architecture contract and successful source checks are necessary but are not release evidence.
+Support is not established until those exact package bytes complete the evidence gate below on Debian 13 amd64. The architecture contract and successful source checks are necessary but are not release evidence.
 
 The canonical remaining-work gate is `docs/production-readiness.md`. Record exact candidate and host results in `docs/validation-record.md`, using `docs/manual-validation.md` for executable steps.
 
@@ -15,14 +15,14 @@ The canonical remaining-work gate is `docs/production-readiness.md`. Record exac
 The release issue and release body must identify:
 
 - Tag, immutable commit SHA, artifact filename, byte size, and SHA-256.
-- CI run URL for the tagged commit and successful formatting, tests, vet, build, bundle, and staged-asset checks.
-- Bundle manifest and successful offline `verify-bundle` output.
+- CI run URL for the tagged commit and successful formatting, tests, vet, package build, lintian, reproducibility, and staged-asset checks.
+- Debian control metadata, installed manifest, checksum inventory, and successful offline `verify-deb.sh` output.
 - Completed `docs/manual-validation.md` evidence from disposable Debian 13 amd64 hosts.
 - nftables, systemd, kernel, and Docker versions exercised.
 - First-install timeout deletion, prior-generation rollback, confirmation, session death, reboot reconciliation, DDNS, coexistence, Docker-table preservation, install, upgrade, and uninstall results.
 - Dependency and Apache-2.0/third-party notice review.
 - Known limitations, unsupported environments, and operator-impacting changes.
-- Reviewer approval from someone other than the artifact producer.
+- Pull request and required-CI evidence for the candidate source commit.
 
 Do not describe an unexecuted check as passed. Record unsupported or unexercised cases explicitly.
 
@@ -30,17 +30,19 @@ Do not describe an unexecuted check as passed. Record unsupported or unexercised
 
 1. Update release notes and support documentation.
 2. Run `sh ./scripts/check.sh` and delivery-asset verification.
-3. Build the bundle from the intended commit with the intended version.
-4. Verify the archive after extraction and record its checksum.
+3. Build the Debian package once from the intended commit with the intended version.
+4. Verify package metadata and extracted contents and record its checksum.
 5. Complete exact-artifact manual validation.
-6. Complete `docs/validation-record.md` and obtain independent approval.
-7. Create the SemVer tag only after evidence and approval are complete.
-8. Publish the archive and checksum/provenance evidence together.
-9. Download the public artifact in a clean environment and repeat bundle verification.
+6. Complete and self-review `docs/validation-record.md`; this personal project does not require an independent approver.
+7. Create the SemVer tag only after the evidence record is complete.
+8. Publish the package and checksum/provenance evidence together.
+9. Download the public artifact in a clean environment and repeat package verification and installation.
 
 Release automation must use least privilege, pin third-party actions to immutable commits, avoid `pull_request_target` for untrusted code, and expose no release secrets to pull-request jobs. Never force-push or silently replace a published artifact; issue a new version.
 
-The build and promotion workflows are active together at `.github/workflows/release-build.yml` and `.github/workflows/release-promote.yml`. Promotion is manual and protected by the `release` environment; configure that environment to require independent approval before the first release. The promotion workflow deliberately verifies attestations against the build path `actions/workflows/release-build.yml@$GITHUB_SHA`; changing that path or the build workflow name requires updating and validating the promotion identity checks before use.
+The build and promotion workflows are active together at `.github/workflows/release-build.yml` and `.github/workflows/release-promote.yml`. Promotion remains an explicit manual action. The promotion workflow verifies that the tag commit is on `main` and deliberately verifies attestations against the build path `actions/workflows/release-build.yml@$GITHUB_SHA`; changing that path or workflow name requires updating and validating the promotion identity checks before use.
+
+`main` requires a pull request and the `test`, `analysis`, `delivery-assets`, and `nft-syntax` checks. No approving review is required, but administrators cannot bypass the PR or checks, and force pushes and deletion are disabled.
 
 ## Commit Convention
 

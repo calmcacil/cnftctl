@@ -8,7 +8,7 @@ Copy this file into the release issue or a version-specific evidence document. D
 | --- | --- |
 | Version/tag | `RECORD_AT_VALIDATION` |
 | Commit SHA | `RECORD_AT_VALIDATION` |
-| Artifact filename | `cnftctl-VERSION-debian13-amd64.tar.gz` |
+| Artifact filename | `cnftctl_VERSION_amd64.deb` |
 | Artifact byte size | `RECORD_AT_VALIDATION` |
 | Artifact SHA-256 | `RECORD_AT_VALIDATION` |
 | Build workflow/run | `RECORD_AT_VALIDATION` |
@@ -16,7 +16,7 @@ Copy this file into the release issue or a version-specific evidence document. D
 | SBOM identity | `RECORD_AT_VALIDATION` |
 | Provenance identity | `RECORD_AT_VALIDATION` |
 | Artifact producer | `RECORD_AT_VALIDATION` |
-| Independent reviewer | `RECORD_AT_VALIDATION` |
+| Candidate self-review | `RECORD_AT_VALIDATION` |
 
 ## Host Identity
 
@@ -41,18 +41,19 @@ Copy this file into the release issue or a version-specific evidence document. D
 | Race tests | `PASS/FAIL` | `RECORD` |
 | Staticcheck | `PASS/FAIL` | `RECORD` |
 | govulncheck | `PASS/FAIL` | `RECORD` |
-| Bundle lifecycle tests | `PASS/FAIL` | `RECORD` |
+| Package reproducibility and lifecycle tests | `PASS/FAIL` | `RECORD` |
+| Lintian | `PASS/FAIL` | `RECORD` |
 | systemd unit validation | `PASS/FAIL` | `RECORD` |
 | Staged nftables syntax | `PASS/FAIL` | `RECORD` |
 | Shellcheck/actionlint | `PASS/FAIL` | `RECORD` |
 | License/notices/sanitization | `PASS/FAIL` | `RECORD` |
-| Offline bundle verification | `PASS/FAIL` | `RECORD` |
+| Offline package verification | `PASS/FAIL` | `RECORD` |
 
 ## Host Validation Results
 
 | Area | Result | Evidence URL/Attachment |
 | --- | --- | --- |
-| Staged install/uninstall contract | `PASS/FAIL` | `RECORD` |
+| Package install/remove contract | `PASS/FAIL` | `RECORD` |
 | First live install activates no policy | `PASS/FAIL` | `RECORD` |
 | Desired config defaults and permissions | `PASS/FAIL` | `RECORD` |
 | Exact candidate validation | `PASS/FAIL` | `RECORD` |
@@ -108,12 +109,12 @@ Evidence: `RECORD_AT_VALIDATION`
 
 ## Final Decision
 
-- [ ] Every mandatory non-Docker base-tier check passed for the same archive SHA-256.
+- [ ] Every mandatory non-Docker base-tier check passed for the same package SHA-256.
 - [ ] All failures and `NOT EXERCISED` items are disclosed in release notes.
-- [ ] Artifact identity matches build, host evidence, approval, and publication inputs.
-- [ ] Independent reviewer checked the evidence and approved promotion.
+- [ ] Artifact identity matches build, host evidence, self-review, and publication inputs.
+- [ ] Candidate evidence and known limitations received an explicit self-review.
 - [ ] Publicly downloaded bytes were reverified after publication.
 
 Decision: `APPROVE / REJECT`
 
-Approver, UTC timestamp, and rationale: `RECORD_AT_APPROVAL`
+Owner, UTC timestamp, and rationale: `RECORD_AT_DECISION`

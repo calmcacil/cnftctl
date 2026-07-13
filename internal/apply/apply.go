@@ -649,6 +649,7 @@ func verifyInstalledAssetsAt(root string) error {
 	assets := []string{
 		"/usr/bin/cnftctl",
 		"/usr/lib/cnftctl/cnftctl-recover",
+		"/usr/lib/cnftctl/inspect-transaction",
 		"/usr/lib/systemd/system/cnftctl-firewall.service",
 		"/usr/lib/systemd/system/cnftctl-reconcile.service",
 		"/usr/lib/systemd/system/cnftctl-rollback@.service",
@@ -693,6 +694,7 @@ func verifyInstalledInventory(root string, required []string) error {
 	}
 	installed := map[string]string{"bin/cnftctl": "/usr/bin/cnftctl", "manifest": "/var/lib/cnftctl/delivery/manifest"}
 	installed["scripts/cnftctl-recover"] = "/usr/lib/cnftctl/cnftctl-recover"
+	installed["scripts/inspect-transaction"] = "/usr/lib/cnftctl/inspect-transaction"
 	for _, path := range required {
 		if strings.HasPrefix(path, "/usr/lib/systemd/system/") {
 			installed["systemd/"+filepath.Base(path)] = path

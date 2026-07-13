@@ -1,0 +1,3 @@
+# The Go CLI is intentionally built with CGO disabled as one static Debian
+# amd64 binary; nftables and systemd remain explicit runtime dependencies.
+cnftctl: statically-linked-binary [usr/bin/cnftctl]

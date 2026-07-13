@@ -4,7 +4,7 @@
 
 - Version/tag: `vX.Y.Z`
 - Commit: `FULL_SHA`
-- Artifact: `cnftctl-X.Y.Z-debian13-amd64.tar.gz`
+- Artifact: `cnftctl_X.Y.Z_amd64.deb`
 - Artifact SHA-256: `RECORD_AT_RELEASE`
 - CI run: `RECORD_AT_RELEASE`
 - Tester and UTC date: `RECORD_AT_RELEASE`
@@ -13,9 +13,9 @@
 
 This release provides the narrow `inet hostfw` manager for Debian 13 amd64, including desired YAML configuration, immutable generations, dedicated systemd activation, mandatory dead-man rollback and boot reconciliation, SSH session coverage checks with audited override, optional DDNS SSH sets, and optional strict Docker WAN gating.
 
-**Production status: NOT READY** until every evidence placeholder below is replaced with results from the exact canonical `cnftctl-X.Y.Z-debian13-amd64.tar.gz` artifact on Debian 13 amd64. This template describes the intended release contract and is not proof that any implementation or artifact passed.
+This template is not release evidence. Replace every placeholder with results from the exact canonical `cnftctl_X.Y.Z_amd64.deb` package on Debian 13 amd64 before publication.
 
-The supported installation unit is the complete verified bundle. Installation does not activate firewall policy. Docker is never restarted automatically.
+The supported installation unit is the verified Debian package. Installation enables only reconciliation and does not activate firewall policy, enable DDNS, or restart Docker.
 
 ## Compatibility And Limitations
 
@@ -25,14 +25,14 @@ The supported installation unit is the complete verified bundle. Installation do
 - DDNS trusts configured DNS results and supports only `/56` or `/64` IPv6 derivation.
 - `doctor` currently performs the same checks as `status`.
 - The rollback timeout is fixed at 120 seconds.
-- Manual reference deployment is a behavior reference, not the supported bundle lifecycle.
+- Manual reference deployment and the internal bundle are behavior/build references, not supported installation paths.
 - `transactions list` reports pending transactions, not historical completed transactions.
-- Production use remains blocked until all exact-artifact evidence below passes; do not substitute source-tree or code-fix results.
+- Support remains withheld until all exact-artifact evidence below passes; do not substitute source-tree or code-fix results.
 
 ## Evidence
 
 - CI checks: `PASS/FAIL` with URL.
-- Offline bundle verification: `PASS/FAIL` with output attachment.
+- Offline package verification, reproducibility, and lintian: `PASS/FAIL` with output attachment.
 - First-install timeout/table deletion: `PASS/FAIL`.
 - Confirm and prior-generation rollback: `PASS/FAIL`.
 - Initiating-session death and reboot reconciliation: `PASS/FAIL`.

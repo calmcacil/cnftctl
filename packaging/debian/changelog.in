@@ -1,0 +1,5 @@
+cnftctl (@DEBIAN_VERSION@) unstable; urgency=medium
+
+  * Build the cnftctl @UPSTREAM_VERSION@ release.
+
+ -- Calmcacil B. <716671+calmcacil@users.noreply.github.com>  @DATE@

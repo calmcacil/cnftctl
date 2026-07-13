@@ -14,7 +14,7 @@
 
 ## CI And Release
 - Active automation is defined by the files currently under `.github/workflows/`; do not infer workflow state from old documentation.
-- The supported delivery unit is the complete Debian 13 amd64 bundle, never a standalone binary. Exact-artifact evidence requirements are in `docs/release-process.md` and `docs/manual-validation.md`.
+- The supported delivery unit is the native Debian 13 amd64 package, never a standalone binary or the internal staging bundle. Exact-artifact evidence requirements are in `docs/release-process.md` and `docs/manual-validation.md`.
 - Release automation must use least privilege, immutable third-party action pins, and no secret-bearing untrusted PR execution.
 - Versioning uses SemVer and commit messages use Conventional Commits by convention; commit-message lint enforcement is not required.
 - `.opencode/plans/` is ignored local planning state; do not rely on it being present for future clones.

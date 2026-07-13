@@ -1,0 +1,36 @@
+#!/bin/sh
+set -eu
+
+root=${CNFTCTL_MAINT_ROOT:-}
+dest() { printf '%s%s\n' "$root" "$1"; }
+fail() { echo "cnftctl pre-install: $*" >&2; exit 1; }
+
+case ${1:-} in
+    install|upgrade) ;;
+    abort-upgrade) exit 0 ;;
+    *) fail "unsupported dpkg action ${1:-missing}" ;;
+esac
+
+arch=${CNFTCTL_DPKG_ARCH:-$(dpkg --print-architecture)}
+[ "$arch" = amd64 ] || fail "Debian amd64 is required"
+os_release=${CNFTCTL_OS_RELEASE:-$(dest /etc/os-release)}
+[ -f "$os_release" ] || fail "Debian 13 platform identity is unavailable"
+# Required platform file on the target.
+# shellcheck disable=SC1090,SC1091
+. "$os_release"
+[ "${ID:-}" = debian ] || fail "Debian is required"
+[ "${VERSION_ID:-}" = 13 ] || fail "Debian 13 is required"
+
+transactions=$(dest /var/lib/cnftctl/transactions)
+[ ! -e "$transactions" ] || [ -d "$transactions" ] || fail "transaction history is unsafe"
+if [ -d "$transactions" ]; then
+    inspect=${CNFTCTL_INSPECT_TRANSACTION:-$(dest /usr/lib/cnftctl/inspect-transaction)}
+    [ -x "$inspect" ] || fail "existing transaction history cannot be safely validated"
+    for tx in "$transactions"/*; do
+        [ -e "$tx" ] || continue
+        phase=$("$inspect" "$tx") || fail "transaction history is corrupt or unresolved"
+        case $phase in confirmed|rolled-back) ;; *) fail "transaction history is corrupt or unresolved" ;; esac
+    done
+fi
+
+exit 0

@@ -8,18 +8,15 @@ fi
 
 version=$1
 out=$2
-case $version in
-    [0-9]*.[0-9]*.[0-9]*) ;;
-    *) echo "version must be a SemVer value without a leading v: $version" >&2; exit 2 ;;
-esac
-case $version in
-    *[!0-9A-Za-z.+-]*) echo "invalid version: $version" >&2; exit 2 ;;
-esac
+printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$' || {
+    echo "version must be SemVer without a leading v: $version" >&2
+    exit 2
+}
 
 src=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 [ ! -e "$out" ] || { echo "output already exists: $out" >&2; exit 1; }
 mkdir -p "$out/bin" "$out/systemd" "$out/scripts" "$out/docs"
-go build -trimpath -ldflags "-s -w -X main.version=$version" -o "$out/.version-check" "$src/cmd/cnftctl"
+CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$version" -o "$out/.version-check" "$src/cmd/cnftctl"
 actual_version=$("$out/.version-check" --version)
 rm "$out/.version-check"
 [ "$actual_version" = "cnftctl $version" ] || { echo "binary version mismatch: $actual_version" >&2; exit 1; }

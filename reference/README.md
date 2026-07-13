@@ -1,6 +1,6 @@
 # Reference nftables Docker firewall with DDNS SSH whitelist
 
-> **DO NOT DEPLOY OR EXECUTE THIS DIRECTORY AS A PRODUCTION FIREWALL.** This is a sanitized compatibility reference for review only. It omits cnftctl's mandatory exact-generation validation, durable transactions, fixed rollback, boot reconciliation, ownership checks, and active-generation DDNS scheduling. The only intended delivery unit is the canonical `cnftctl-VERSION-debian13-amd64.tar.gz` bundle, whose production status remains **NOT READY** pending exact Debian 13 amd64 evidence.
+> **DO NOT DEPLOY OR EXECUTE THIS DIRECTORY AS A PRODUCTION FIREWALL.** This is a sanitized compatibility reference for review only. It omits cnftctl's mandatory exact-generation validation, durable transactions, fixed rollback, boot reconciliation, ownership checks, and active-generation DDNS scheduling. The only supported delivery unit is a canonical `cnftctl_VERSION_amd64.deb` package that has completed exact Debian 13 amd64 validation.
 
 This folder is a sanitized historical behavior baseline for a default-deny nftables
 firewall. Its files are intentionally not an installation or operations guide.

@@ -2,16 +2,17 @@
 
 ## Install And Upgrade
 
-Verify and install only a complete release bundle:
+Download the Debian package, checksums, and provenance from the same release. Verify and install the package:
 
 ```sh
-./scripts/verify-bundle .
-sudo ./install.sh
+sha256sum --check release-checksums.txt
+gh attestation verify cnftctl_VERSION_amd64.deb --repo calmcacil/cnftctl
+sudo apt install ./cnftctl_VERSION_amd64.deb
 ```
 
-Installation deploys `/usr/bin/cnftctl`, fixed units under `/usr/lib/systemd/system`, and delivery metadata under `/var/lib/cnftctl`. It enables boot reconciliation and the DDNS timer unit but does not activate firewall policy. At boot and after policy transitions, reconciliation derives whether the timer runs from the selected active generation, never from unapplied desired config.
+Installation deploys `/usr/bin/cnftctl`, fixed units under `/usr/lib/systemd/system`, and delivery metadata under `/var/lib/cnftctl`. It enables only boot reconciliation and does not activate firewall policy or DDNS. At boot and after policy transitions, reconciliation derives whether the DDNS timer runs from the selected active generation, never from unapplied desired config.
 
-The upgrade contract is to verify the new bundle and run its `install.sh`; it must refuse while `transactions list` reports any pending transaction and preserve desired configuration, generations, ownership, and active selection. Use upgrade in production only after the exact candidate artifact passes the upgrade section of `docs/manual-validation.md`.
+The upgrade contract is to verify the new package and install it with `apt`; package pre-installation must refuse unresolved or unsafe transaction history and preserve desired configuration, generations, ownership, and active selection. Use an upgrade in production only after the exact candidate package passes the upgrade section of `docs/manual-validation.md`.
 
 ## Desired Policy
 
@@ -113,14 +114,14 @@ Capture `status --output json` without `--detail` for routine support. Treat det
 
 ## Uninstall
 
-Uninstall must refuse while `transactions list` reports pending transactions or `inet hostfw` is active, because removing rollback and boot assets in that state is unsafe. After the exact artifact passes manual validation, first follow the policy-deactivation incident procedure with console access, verify the managed table is absent, and run from that verified bundle:
+Removal must refuse while transaction history is unresolved or unsafe, or while `inet hostfw` is active, because removing rollback and boot assets in that state is unsafe. First follow the policy-deactivation incident procedure with console access, verify the managed table is absent, and run:
 
 ```sh
-sudo ./uninstall.sh
+sudo apt remove cnftctl
 ```
 
-Uninstall removes delivery assets and preserves configuration. It does not promise to erase `/etc/cnftctl`, generations, or audit evidence.
+Both `apt remove` and `apt purge` remove delivery assets while preserving `/etc/cnftctl`, immutable generations, and audit evidence. Destructive state cleanup is a separate explicit operator action.
 
 ## Recovery
 
-Use `cnftctl status --detail`, pending transaction state, unit status, and journals before changing files. Prefer `cnftctl rollback ID` for a pending transaction and `cnftctl reconcile` for all unconfirmed transactions. Validate the selected active generation and use the recovery assets from the same verified bundle. See `docs/incident-response.md`.
+Use `cnftctl status --detail`, pending transaction state, unit status, and journals before changing files. Prefer `cnftctl rollback ID` for a pending transaction and `cnftctl reconcile` for all unconfirmed transactions. Validate the selected active generation and use the recovery assets from the same verified package. See `docs/incident-response.md`.

@@ -23,7 +23,6 @@ concurrency:
 
 jobs:
   promote:
-    environment: release
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -52,25 +51,23 @@ jobs:
           test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN_ID" --jq .path)" = ".github/workflows/release-build.yml"
           test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN_ID" --jq .event)" = workflow_dispatch
           test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN_ID" --jq .head_sha)" = "$GITHUB_SHA"
+          relation=$(gh api "repos/$GITHUB_REPOSITORY/compare/$GITHUB_SHA...main" --jq .status)
+          case "$relation" in ahead|identical) ;; *) exit 1 ;; esac
           cd candidate
-          test "$(find . -type f -printf '%P\n' | LC_ALL=C sort)" = "$(printf '%s\n' "cnftctl-$VERSION-debian13-amd64.tar.gz" release-checksums.txt sbom.spdx.json | LC_ALL=C sort)"
+          test "$(find . -type f -printf '%P\n' | LC_ALL=C sort)" = "$(printf '%s\n' "cnftctl_${VERSION}_amd64.deb" release-checksums.txt sbom.spdx.json | LC_ALL=C sort)"
           test -z "$(find . -mindepth 1 -maxdepth 1 ! -type f -print -quit)"
           sha256sum --check release-checksums.txt
           test "$(wc -l <release-checksums.txt)" -eq 2
-          gh attestation verify "cnftctl-$VERSION-debian13-amd64.tar.gz" --repo "$GITHUB_REPOSITORY" --signer-workflow "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/workflows/release-build.yml@$GITHUB_SHA"
-          mkdir unpacked
-          tar -tzf "cnftctl-$VERSION-debian13-amd64.tar.gz" | grep -Eq '^cnftctl-[^/]+-debian13-amd64/$'
-          tar -xzf "cnftctl-$VERSION-debian13-amd64.tar.gz" -C unpacked --no-same-owner --no-same-permissions
-          bundle="unpacked/cnftctl-$VERSION-debian13-amd64"
-          "$bundle/scripts/verify-bundle" "$bundle"
-          test "$("$bundle/bin/cnftctl" --version)" = "cnftctl $VERSION"
-      - name: Publish protected release
+          gh attestation verify "cnftctl_${VERSION}_amd64.deb" --repo "$GITHUB_REPOSITORY" --signer-workflow "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/workflows/release-build.yml@$GITHUB_SHA"
+          cd ..
+          sh ./scripts/verify-deb.sh "candidate/cnftctl_${VERSION}_amd64.deb" "$VERSION"
+      - name: Publish verified release
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.version }}
         run: |
           gh release create "v$VERSION" \
-            "candidate/cnftctl-$VERSION-debian13-amd64.tar.gz" \
+            "candidate/cnftctl_${VERSION}_amd64.deb" \
             candidate/release-checksums.txt \
             candidate/sbom.spdx.json \
             --verify-tag --generate-notes

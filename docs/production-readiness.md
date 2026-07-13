@@ -1,153 +1,100 @@
 # Production Readiness Status
 
-This document is the canonical list of work and evidence remaining before a production release. The implemented code has passed the repository's available unprivileged checks and repeated adversarial review, but **production status remains NOT READY** until the exact release archive passes the host validation gate below.
+This is the canonical gate for the first supported release. A version is supported only after the exact `cnftctl_VERSION_amd64.deb` bytes pass every mandatory check below on Debian 13 amd64. Source checks and results from another delivery format are not substitutes.
 
 ## Current State
 
-Completed in the repository:
+The firewall engine, rollback lifecycle, SSH safety, DDNS behavior, Docker WAN gate, reporting, and systemd integration have completed prior source and host validation. The earlier `0.1.0` tar candidate is retained as historical engineering evidence in `docs/validation-record-0.1.0-tar-candidate.md`, but it is superseded and will not be published.
 
-- Immutable, content-addressed firewall generations with exact-byte validation.
-- Durable apply, confirm, rollback, and boot-reconciliation state transitions.
-- Rollback supervision armed before policy activation.
-- Targeted ownership of `inet hostfw` without modifying `/etc/nftables.conf` or foreign tables.
-- Initial and runtime DDNS resolution with atomic dual-set replacement.
-- SSH current-session coverage checks and audited lockout-risk override.
-- Strict Docker WAN gating through `open_ports`.
-- Versioned JSON health reports and conservative exit codes.
-- Debian 13 amd64 bundle layout, systemd assets, installer, uninstaller, recovery helper, closed inventory, and checksums.
-- Apache-2.0 licensing, security policy, support policy, operator guide, and incident procedures.
-- Formatting, unit tests, race tests, vet, static analysis, vulnerability scanning, fault injection, fuzz smoke tests, bundle lifecycle tests, and workflow validation.
-
-The immutable `0.1.0` candidate at commit
-`88bbf3bb7847d82ea737a8aaa6ad73963f565b1b` was built by Release Candidate
-Build run `29257634117`. Its exact archive SHA-256 is
-`b77228ab67f19e3f484a9ce57f1fe3bd2ecfc546b4e1b888ac8e20ed4e810c0c`.
-CI, provenance, SPDX attestation, offline verification, and the sanitized
-HOST_A/HOST_B record at `docs/validation-record-0.1.0.md` are complete.
-
-Not completed as release evidence:
-
-- No final SemVer tag has been created.
-- Provider-console recovery has not been exercised for this candidate.
-- Raw host output and journals have not been attached to a release issue.
-- No independent reviewer has approved the completed validation record.
-- The protected `release` environment and independent approver still require repository-side configuration.
-- No protected promotion or public-download reverification has been executed.
+The public delivery contract is now a native Debian package. Its implementation, CI candidate, clean-host validation, provider-console drill, protected-branch workflow, tag, promotion, and public-download verification must complete before `v0.1.0`.
 
 ## Mandatory Release Gate
 
-Every item below must be completed for the same archive SHA-256. A failure creates a new candidate and restarts all affected validation; do not replace bytes under an existing version.
+Every artifact-dependent item must refer to the same package SHA-256. A package-byte or runtime-policy change creates a new candidate and restarts affected validation.
 
-### 1. Freeze The Candidate
+### 1. Review And Freeze Source
 
-- [x] Select a SemVer release candidate and immutable commit.
-- [x] Confirm the worktree and module graph are clean.
-- [x] Run `sh ./scripts/check.sh`.
-- [x] Run `go test -count=1 ./...`.
-- [x] Run `go test -race ./...`.
-- [x] Run `staticcheck ./...` using the pinned release tool version.
-- [x] Run `govulncheck ./...` and record reachable findings or approved exceptions.
-- [x] Run `sh ./scripts/verify-delivery-assets.sh`.
-- [x] Record actionlint, shellcheck, systemd-unit, staged nftables, bundle, license, notice, and sanitization results.
+- [ ] Merge the native-package implementation through a pull request.
+- [ ] Require `test`, `analysis`, `delivery-assets`, and `nft-syntax` on up-to-date PR branches.
+- [ ] Enforce PR-only `main` for administrators with zero required approvals, no force pushes, and no branch deletion.
+- [ ] Record clean formatting, unit tests, race tests, vet, staticcheck, govulncheck, actionlint, shellcheck, systemd validation, nft syntax, lintian, package reproducibility, licensing, and sanitization results.
 
-### 2. Build And Identify Exact Bytes
+### 2. Build And Identify Exact Package
 
-- [x] Build `cnftctl-VERSION-debian13-amd64.tar.gz` once from the selected commit.
-- [x] Record archive filename, byte size, SHA-256, commit, Go version, and build-run URL.
-- [x] Verify the extracted archive offline with `scripts/verify-bundle`.
-- [x] Confirm the manifest says Debian 13, amd64, the intended version, and format version `1`.
-- [x] Confirm every delivered regular file is covered by `SHA256SUMS` and no extra file or symlink exists.
-- [x] Generate and retain the SPDX SBOM and keyless build provenance for these exact bytes.
+- [ ] Select the immutable `v0.1.0` source commit on `main`.
+- [ ] Build `cnftctl_0.1.0_amd64.deb` once in the candidate workflow.
+- [ ] Record filename, byte size, SHA-256, commit, Go version, and build-run URL.
+- [ ] Verify control metadata, closed inventory, modes, manifest, installed checksums, maintainer scripts, and embedded CLI version offline.
+- [ ] Generate and retain the SPDX SBOM and keyless build provenance for the package bytes.
 
-### 3. Prepare Validation Hosts
+### 3. Prepare Validation Host
 
-- [x] Create clean disposable Debian 13 amd64 `HOST_A` without Docker.
-- [x] Create clean disposable Debian 13 amd64 `HOST_B` with disposable Docker.
-- [x] Record image identity, kernel, nftables, systemd, Docker, architecture, and UTC start time.
-- [ ] Verify console or hypervisor recovery works before firewall activation.
-- [ ] Keep an independent SSH session and console available throughout remote-policy tests.
+- [ ] Start with clean disposable Debian 13 amd64 without Docker for HOST_A.
+- [ ] Record image identity, kernel, nftables, systemd, architecture, and UTC timestamps.
+- [ ] Exercise provider-console or rescue recovery before firewall activation.
+- [ ] Keep a second SSH session and tested console path available throughout policy tests.
 
-### 4. Validate Installation And Base Lifecycle
+### 4. Validate Package And Base Lifecycle
 
-- [x] Complete Artifact Identity and Staged Install sections in `docs/manual-validation.md`.
-- [x] Verify installation activates no firewall policy and enables only boot reconciliation.
-- [x] Verify `init --dry-run`, desired-config permissions/defaults, JSON reports, and exact candidate validation.
-- [x] Verify first-install timeout removes only `inet hostfw`.
-- [x] Verify confirmation persists and stops rollback supervision only after durable confirmation.
-- [x] Verify a later unconfirmed update restores the exact previous generation.
-- [x] Verify generation files, manifests, modes, inventory, and hashes.
+- [ ] Install the exact package with `apt` and verify it enables only reconciliation and activates no firewall policy or DDNS.
+- [ ] Verify Debian/version/architecture guards and package integrity reporting.
+- [ ] Verify `init --dry-run`, desired-config permissions/defaults, JSON reports, and exact candidate validation.
+- [ ] Verify first-install timeout removes only `inet hostfw`.
+- [ ] Verify confirmation persists and a later unconfirmed update restores the exact prior generation.
+- [ ] Verify generation files, manifests, modes, inventory, ownership, and hashes.
 
 ### 5. Validate Failure Recovery
 
-- [x] Verify terminating the initiating SSH process does not cancel rollback.
-- [x] Verify reboot treats every unconfirmed transaction as failed and restores last-known-good policy.
-- [x] Verify confirmed policy loads through `cnftctl-firewall.service` after reboot.
-- [x] Verify foreign nftables tables survive apply, confirm, timeout rollback, explicit rollback, and reboot.
-- [x] Capture timestamped journal evidence that rollback supervision was active before selector mutation and firewall activation.
-- [ ] Exercise incident checks and recovery commands in `docs/incident-response.md` from console access.
+- [ ] Verify terminating the initiating SSH process does not cancel rollback.
+- [ ] Verify reboot reconciles every unconfirmed transaction to the last-known-good policy.
+- [ ] Verify confirmed policy loads through `cnftctl-firewall.service` after reboot.
+- [ ] Verify foreign nftables tables survive apply, confirm, timeout rollback, explicit rollback, and reboot.
+- [ ] Capture journal ordering proving rollback supervision was active before selector and live-policy mutation.
+- [ ] Exercise incident inspection and recovery commands from provider-console access.
 
-### 6. Validate SSH And DDNS Safety
+### 6. Validate SSH And DDNS
 
-- [x] Verify an uncovered current SSH source blocks hardened apply.
-- [x] Verify the lockout-risk override requires a reason and records it durably.
-- [x] Verify the override does not bypass rollback or other readiness checks.
-- [x] Verify initial DDNS entries are present in the activated exact generation before hardened policy takes effect.
-- [x] Verify A entries, AAAA `/56`, AAAA `/64`, timeouts, all-host failure behavior, stale metadata, and one-batch replacement.
-- [x] Verify DDNS timer enablement follows active-generation intent through apply, rollback, disable, and reboot.
+- [ ] Verify uncovered-source refusal and audited lockout-risk override without any rollback bypass.
+- [ ] Verify initial DDNS seeding before hardened activation.
+- [ ] Verify A, AAAA `/56`, AAAA `/64`, timeouts, all-host failure, stale metadata, and atomic replacement.
+- [ ] Verify DDNS timer intent through apply, confirm, rollback, disable, and reboot.
 
-### 7. Validate Docker Coexistence
+### 7. Validate Docker Coexistence On HOST_B
 
-- [x] Verify Docker-owned tables survive all cnftctl lifecycle operations and reboot.
-- [x] Verify a published container port is blocked until matching `open_ports` intent is applied and confirmed.
-- [x] Verify closing the port blocks it again without restarting Docker.
-- [x] Verify IPv4 original public destination-port gating.
-- [x] Validate IPv6 DNAT/routed behavior when the environment supports it, or record `NOT EXERCISED`; Docker remains experimental until separately qualified.
-- [x] Verify live Docker daemon backend planning validates the exact proposal, is non-mutating, and refuses unsupported backends.
-- [ ] On a daemon that supports the proposed backend, verify an authorized write preserves unrelated JSON, creates a backup, and does not restart Docker. This remains deferred with Docker production qualification because Debian Docker 26 rejects the option.
+- [ ] Safely remove cnftctl after HOST_A, archive/purge disposable test state, verify `inet hostfw` is absent, and install Docker.
+- [ ] Reinstall the same package and verify Docker-owned tables survive every cnftctl lifecycle operation and reboot.
+- [ ] Verify Docker-to-host and Docker bridge behavior remains Docker-controlled when integration is enabled.
+- [ ] Verify published IPv4 traffic is blocked until matching `open_ports` intent is confirmed, closes again without a Docker restart, and uses the original public destination port.
+- [ ] Exercise IPv6 DNAT/routed gating when an external probe is available, otherwise record `NOT EXERCISED`.
+- [ ] Verify backend planning is non-mutating and unsupported writes are refused; a supported backend write remains deferred if Debian's Docker rejects it.
 
-### 8. Validate Operations, Upgrade, And Uninstall
+### 8. Validate Package Upgrade And Removal
 
-- [x] Verify healthy, degraded, pending, failed, unknown, absent, and unsupported report behavior where applicable.
-- [x] Verify JSON schema `cnftctl.report.v1`, detail redaction, stdout purity, and exit codes `0`, `1`, and `2`.
-- [x] Verify journals are actionable and contain no credentials or unsafe environment output.
-- [x] Verify upgrade preserves config, immutable generations, ownership, active policy, and terminal transaction audit records.
-- [x] Verify upgrade refuses unresolved, corrupt, malformed, or symlinked transaction state.
-- [x] Verify uninstall refuses active policy and unresolved transactions.
-- [x] Verify approved inactive uninstall removes delivery assets, reloads systemd, and preserves operator configuration unless separately purged.
+- [ ] Verify package upgrade preserves config, immutable generations, ownership, active policy, selection, and terminal audit history.
+- [ ] Verify pre-installation rejects unresolved, corrupt, malformed, duplicated-field, trailing-data, and symlinked transaction state.
+- [ ] Verify removal rejects active `inet hostfw` and unsafe transaction state.
+- [ ] Verify inactive `apt remove` and `apt purge` remove delivery assets, reload systemd, and preserve `/etc/cnftctl` and `/var/lib/cnftctl`.
+- [ ] Verify failures in required systemd operations abort safely without silently removing recovery coverage.
 
-### 9. Approve And Promote
+### 9. Record And Publish
 
-- [x] Complete a version-specific copy of `docs/validation-record.md` without blank `PASS/FAIL/NOT EXERCISED` fields.
-- [ ] Attach complete `docs/manual-validation.md` command output and journals to the release issue.
-- [ ] Record known limitations and every `NOT EXERCISED` item in release notes.
-- [ ] Obtain reviewer approval from someone other than the artifact producer.
-- [x] Move both reviewed release workflows together to their documented active paths.
-- [ ] Promote the exact validated bytes without rebuilding through the protected release environment.
-- [ ] Download the public archive in a clean environment and repeat checksum, provenance, and bundle verification.
+- [ ] Complete `docs/validation-record-0.1.0.md` with raw command output and journals attached to the release issue.
+- [ ] Record every limitation and `NOT EXERCISED` item in release notes.
+- [ ] Self-review candidate identity, evidence, and publication inputs; no independent approval is required for this personal project.
+- [ ] Tag the exact validated source commit as `v0.1.0`.
+- [ ] Promote the candidate package without rebuilding.
+- [ ] Download the public package in a clean Debian 13 environment and repeat checksum, provenance, package, installation, version, and removal verification.
 
 ## Stop Conditions
 
-Do not publish or deploy when any of these conditions exists:
-
-- A critical or high code-review finding is unresolved.
-- Any mandatory base-lifecycle, rollback, reboot, ownership, SSH, DDNS, installation, upgrade, or uninstall check fails.
-- Artifact identity differs between CI, host validation, approval, and publication.
-- Validation was performed on a source build, standalone binary, arm64 host, container, non-Debian-13 host, or rebuilt archive instead of the exact candidate.
-- Required evidence is missing, ambiguous, edited to hide a failure, or recorded as passed without execution.
-- The operator has no tested out-of-band recovery route.
+Do not publish when a mandatory check fails; artifact identity differs between CI, hosts, tag, and publication; evidence is missing or ambiguous; validation used rebuilt bytes or an unsupported host; or no tested out-of-band recovery route exists.
 
 ## Deferred Work
 
-These are not blockers for the narrow Debian 13 amd64 base release unless the release claims them as supported:
-
-- Production qualification of Docker integration, especially IPv6 routing modes.
-- Debian 13 arm64, Ubuntu, other distributions, and non-systemd systems.
-- Native `.deb` or `.rpm` packages.
-- Independent long-lived project signing keys.
-- SSH-disabled mode.
-- Docker-native publish-as-WAN-authority policy.
-- Fleet APIs, daemons, metrics exporters, or generic nftables management.
-- Linux `openat2` descriptor-relative state-path confinement as additional defense in depth.
+- Docker external IPv6 qualification and supported daemon-backend migration.
+- Debian 13 arm64, other distributions, non-systemd systems, RPMs, and an APT repository.
+- Independent long-lived signing keys beyond GitHub attestations and release checksums.
+- SSH-disabled mode, fleet APIs, generic nftables management, and additional `openat2` state-path confinement.
 
 ## Source Documents
 
@@ -155,5 +102,5 @@ These are not blockers for the narrow Debian 13 amd64 base release unless the re
 - Fillable evidence record: `docs/validation-record.md`
 - Release procedure: `docs/release-process.md`
 - Release evidence template: `docs/release-notes.md`
-- Supported and unsupported environments: `docs/support-matrix.md`
+- Supported environments: `docs/support-matrix.md`
 - Operational recovery: `docs/incident-response.md`

@@ -50,8 +50,8 @@ jobs:
           cache: true
       - name: Install pinned analyzers
         run: |
-          go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
-          go install honnef.co/go/tools/cmd/staticcheck@2025.1.1
+          GOTOOLCHAIN=local go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
+          GOTOOLCHAIN=local go install honnef.co/go/tools/cmd/staticcheck@v0.8.0-rc.1
       - name: Vulnerability scan
         run: govulncheck ./...
       - name: Static analysis
@@ -72,16 +72,20 @@ jobs:
       - name: Install shell and workflow linters
         run: |
           sudo apt-get update
-          sudo apt-get install --yes shellcheck
+          sudo apt-get install --yes lintian shellcheck
           go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
       - name: Validate workflows and shell
         run: |
           actionlint .github/workflows/*.yml
-          shellcheck scripts/*.sh packaging/*.sh packaging/bundle/*.sh packaging/bundle/scripts/*
+          shellcheck scripts/*.sh packaging/*.sh packaging/bundle/*.sh packaging/bundle/scripts/* packaging/debian/preinst packaging/debian/postinst packaging/debian/prerm packaging/debian/postrm
       - name: Verify systemd and delivery assets
         run: sh ./scripts/verify-delivery-assets.sh
-      - name: Build and verify bundle
-        run: sh ./scripts/build-bundle.sh 0.0.0-ci "$RUNNER_TEMP/cnftctl-bundle"
+      - name: Build and verify delivery package
+        run: |
+          sh ./scripts/build-bundle.sh 0.0.0-ci "$RUNNER_TEMP/cnftctl-bundle"
+          sh ./scripts/build-deb.sh 0.0.0-ci "$RUNNER_TEMP/cnftctl_0.0.0-ci_amd64.deb"
+          sh ./scripts/verify-deb.sh "$RUNNER_TEMP/cnftctl_0.0.0-ci_amd64.deb" 0.0.0-ci
+          lintian --fail-on error "$RUNNER_TEMP/cnftctl_0.0.0-ci_amd64.deb"
 
   nft-syntax:
     runs-on: ubuntu-latest

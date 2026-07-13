@@ -78,9 +78,9 @@ Exit `0` means success/healthy, `1` means an inspection emitted usable unhealthy
 
 ## Installation Boundary
 
-The canonical artifact is `cnftctl-VERSION-debian13-amd64.tar.gz`, a complete Debian 13 amd64 bundle. Its verifier checks manifest identity, target metadata, version syntax, and `SHA256SUMS`. Installation atomically replaces the executable, installs the owned `/etc/nftables.conf` bootstrap plus fixed systemd units and recovery assets, reloads systemd, and enables reconciliation plus the DDNS timer without activating firewall policy. Upgrade and uninstall are blocked while pending transactions exist, and uninstall additionally checks for active `inet hostfw`.
+The canonical artifact is `cnftctl_VERSION_amd64.deb`, a native Debian 13 amd64 package. Its verifier checks package metadata, closed inventory, manifest identity, target metadata, version, modes, and installed checksums. Installation places the executable, fixed systemd units, integrity inventory, documentation, and recovery assets, reloads systemd, and enables only reconciliation without activating firewall policy. Upgrade and removal are blocked while transaction history is unresolved or unsafe, and removal additionally checks for active `inet hostfw`. Removal and purge preserve operator configuration, immutable generations, and transaction audit state.
 
-This section states the approved architecture contract, not release evidence. **Production status is NOT READY** until the canonical artifact passes the exact Debian 13 amd64 checks and evidence gate in `docs/manual-validation.md`; code changes alone do not satisfy that gate.
+This section states the approved architecture contract, not release evidence. A version is supported only after its exact package passes the Debian 13 amd64 checks and evidence gate in `docs/manual-validation.md`; code changes alone do not satisfy that gate.
 
 ## Non-Goals
 

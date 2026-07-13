@@ -1,0 +1,39 @@
+#!/bin/sh
+set -eu
+
+root=${CNFTCTL_MAINT_ROOT:-}
+systemctl_cmd=${CNFTCTL_SYSTEMCTL:-systemctl}
+nft_cmd=${CNFTCTL_NFT:-nft}
+dest() { printf '%s%s\n' "$root" "$1"; }
+fail() { echo "cnftctl pre-removal: $*" >&2; exit 1; }
+
+case ${1:-} in
+    upgrade|failed-upgrade) exit 0 ;;
+    remove|deconfigure) ;;
+    *) fail "unsupported dpkg action ${1:-missing}" ;;
+esac
+
+transactions=$(dest /var/lib/cnftctl/transactions)
+[ ! -e "$transactions" ] || [ -d "$transactions" ] || fail "transaction history is unsafe"
+if [ -d "$transactions" ]; then
+    inspect=${CNFTCTL_INSPECT_TRANSACTION:-$(dest /usr/lib/cnftctl/inspect-transaction)}
+    [ -x "$inspect" ] || fail "transaction history cannot be safely validated"
+    for tx in "$transactions"/*; do
+        [ -e "$tx" ] || continue
+        phase=$("$inspect" "$tx") || fail "transaction history is corrupt or unresolved"
+        case $phase in confirmed|rolled-back) ;; *) fail "transaction history is corrupt or unresolved" ;; esac
+    done
+fi
+
+if [ -z "$root" ]; then
+    "$nft_cmd" list table inet hostfw >/dev/null 2>&1 && fail "managed policy inet hostfw is active; keep rollback assets installed"
+elif [ "${CNFTCTL_POLICY_INACTIVE:-0}" != 1 ]; then
+    fail "staged removal requires CNFTCTL_POLICY_INACTIVE=1"
+fi
+
+"$systemctl_cmd" disable --now cnftctl-ddns-refresh.timer cnftctl-reconcile.service cnftctl-firewall.service
+for unit in cnftctl-ddns-refresh.timer cnftctl-reconcile.service cnftctl-firewall.service; do
+    "$systemctl_cmd" is-enabled --quiet "$unit" && fail "failed to disable $unit"
+done
+
+exit 0

@@ -1,8 +1,8 @@
 # Exact Artifact Manual Validation
 
-Execute this checklist against the exact archive proposed for release, on disposable Debian 13 amd64 hosts with console access. Record the artifact filename, SHA-256, commit, tester, UTC timestamps, host image, nftables version, systemd version, Docker version when used, commands, outputs, and pass/fail evidence in the release issue.
+Execute this checklist against the exact Debian package proposed for release, on disposable Debian 13 amd64 hosts with console access. Record the artifact filename, SHA-256, commit, tester, UTC timestamps, host image, nftables version, systemd version, Docker version when used, commands, outputs, and pass/fail evidence in the release issue.
 
-The canonical archive name is `cnftctl-VERSION-debian13-amd64.tar.gz`. **Production status is NOT READY** until this checklist passes for those exact bytes; architecture documentation and code-test results are not substitutes.
+The canonical artifact name is `cnftctl_VERSION_amd64.deb`. A version is unsupported until this checklist passes for those exact bytes; architecture documentation and code-test results are not substitutes.
 
 Use `docs/production-readiness.md` as the release gate and record results in `docs/validation-record.md`. This file supplies the executable host steps; all three documents must refer to the same artifact SHA-256.
 
@@ -11,41 +11,33 @@ Use two clean validation phases: `HOST_A` without Docker and `HOST_B` with a dis
 ## Artifact Identity
 
 ```sh
-export ARTIFACT=cnftctl-VERSION-debian13-amd64.tar.gz
+export VERSION=VERSION
+export ARTIFACT=$(realpath "cnftctl_${VERSION}_amd64.deb")
 sha256sum "$ARTIFACT"
-rm -rf /tmp/cnftctl-artifact
-mkdir /tmp/cnftctl-artifact
-tar -xzf "$ARTIFACT" -C /tmp/cnftctl-artifact --strip-components=1
-cd /tmp/cnftctl-artifact
-./scripts/verify-bundle .
-sed -n '1,20p' manifest
-sha256sum -c SHA256SUMS
+sh ./scripts/verify-deb.sh "$ARTIFACT" "$VERSION"
+dpkg-deb --info "$ARTIFACT"
+dpkg-deb --contents "$ARTIFACT"
 ```
 
-- [ ] Archive checksum matches published release evidence.
-- [ ] Bundle verification succeeds without network access.
-- [ ] Manifest says `format=1`, `product=cnftctl`, `architecture=amd64`, `os=debian-13`, and the intended version.
-- [ ] `SHA256SUMS` covers the delivered payload and no unexpected executable or secret is present.
+- [ ] Package checksum matches published release evidence.
+- [ ] Package verification succeeds without network access.
+- [ ] Control metadata and the installed manifest identify package `cnftctl`, Debian 13, `amd64`, and the intended upstream and Debian versions.
+- [ ] The closed inventory and installed `SHA256SUMS` contain no unexpected executable or secret.
 
-## Staged Install Contract
+## Offline Package Contract
 
 ```sh
-rm -rf /tmp/cnftctl-root
-mkdir /tmp/cnftctl-root
-CNFTCTL_INSTALL_ROOT=/tmp/cnftctl-root CNFTCTL_BUNDLE_ARCH=amd64 ./install.sh
-test -x /tmp/cnftctl-root/usr/bin/cnftctl
-test -f /tmp/cnftctl-root/var/lib/cnftctl/delivery/manifest
-CNFTCTL_INSTALL_ROOT=/tmp/cnftctl-root ./uninstall.sh --force-inactive
-test ! -e /tmp/cnftctl-root/usr/bin/cnftctl
+sh ./packaging/test-deb.sh
+lintian --fail-on error "$ARTIFACT"
 ```
 
-- [ ] Staged install and uninstall succeed and leave no delivery binary.
-- [ ] Staged uninstall reports that configuration is preserved.
+- [ ] Reproducible package and maintainer-script lifecycle tests pass.
+- [ ] Lintian reports no errors.
 
 ## First Install On HOST_A
 
 ```sh
-sudo ./install.sh
+sudo apt install -y "$ARTIFACT"
 /usr/bin/cnftctl --version
 systemctl is-enabled cnftctl-reconcile.service
 ! systemctl is-enabled cnftctl-firewall.service
@@ -192,7 +184,7 @@ sudo nft add table inet validation_foreign
 sudo nft list ruleset > /tmp/rules-before-cnftctl.nft
 sudo docker run -d --name cnftctl-web -p 18080:80 nginx:alpine
 sudo nft list tables > /tmp/docker-tables-before
-sudo ./install.sh
+sudo apt install -y "$ARTIFACT"
 sudo cnftctl init --wan-interface eth0 --enable-docker --yes
 sudo cnftctl apply | tee /tmp/docker-apply.txt
 TX=$(sed -n 's/^applied transaction \([0-9a-f]\{32\}\) .*/\1/p' /tmp/docker-apply.txt)
@@ -237,29 +229,28 @@ journalctl -u cnftctl-ddns-refresh.service --no-pager
 
 ## Upgrade And Uninstall
 
-Install the previous released bundle, create and confirm a generation, then install the candidate bundle.
+Install the previous released package, create and confirm a generation, then install the candidate package.
 
 ```sh
-sudo ./install.sh
+sudo apt install -y ./cnftctl_PREVIOUS_amd64.deb
 sudo cnftctl status
-# From the candidate bundle:
-sudo ./install.sh
+sudo apt install -y "$ARTIFACT"
 sudo cnftctl status
 sudo nft list table inet hostfw
-! sudo ./uninstall.sh
+! sudo apt remove -y cnftctl
 sudo cnftctl rollback 2>/dev/null || true
 ```
 
 - [ ] Upgrade preserves desired config, generations, ownership, and active policy.
 - [ ] Upgrade is blocked while any durable transaction is unresolved or its state is unsafe or corrupt.
 - [ ] Uninstall is blocked while `inet hostfw` is active and while transaction state is unresolved, unsafe, or corrupt; valid terminal audit history is preserved and accepted.
-- [ ] After intentionally removing the managed table through the approved incident procedure and resolving transaction state, `sudo ./uninstall.sh` removes delivery assets, preserves `/etc/cnftctl/config.yaml`, and reloads systemd.
+- [ ] After intentionally removing the managed table through the approved incident procedure and resolving transaction state, `sudo apt remove -y cnftctl` removes delivery assets, preserves `/etc/cnftctl/config.yaml` and `/var/lib/cnftctl`, and reloads systemd.
 - [ ] Upgrade and uninstall consume the current pending-transaction contract; any mismatch or unsafe acceptance fails the artifact and must not be waived or edited in place.
 
 ## Release Gate
 
-- [ ] `sh ./scripts/check.sh`, bundle build, staged validation, and delivery-asset verification pass for the tagged commit.
+- [ ] `sh ./scripts/check.sh`, package build, lintian, staged validation, and delivery-asset verification pass for the tagged commit.
 - [ ] All checklist evidence is attached to the release issue and references the exact artifact SHA-256.
-- [ ] CI provenance, checksums, dependency/license review, known limitations, and approver sign-off are recorded.
-- [ ] If release workflows are activated, both disabled workflow files were moved together to the exact `.github/workflows/release-build.yml` and `.github/workflows/release-promote.yml` paths, and promotion accepted the build workflow's attestation identity at the tagged commit.
+- [ ] CI provenance, checksums, dependency/license review, known limitations, and candidate self-review are recorded.
+- [ ] Promotion accepted the build workflow's attestation identity at the tagged commit and verified that commit is on protected `main`.
 - [ ] Documentation and examples pass the repository sanitization searches.

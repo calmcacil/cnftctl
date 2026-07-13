@@ -47,6 +47,7 @@ CNFTCTL_INSTALL_ROOT="$root" CNFTCTL_BUNDLE_ARCH=amd64 CNFTCTL_TEST_SYSTEMD=1 CN
 [ "$(sed -n '/^enable /p' "$systemctl_log")" = "enable --now cnftctl-reconcile.service" ] || { echo "installer enabled an unexpected service" >&2; exit 1; }
 ! grep -q 'cnftctl-firewall.service' "$systemctl_log" || { echo "installer touched firewall service" >&2; exit 1; }
 [ -f "$root/var/lib/cnftctl/delivery/SHA256SUMS" ] || { echo "installed checksum missing" >&2; exit 1; }
+[ -x "$root/usr/lib/cnftctl/inspect-transaction" ] || { echo "installed transaction inspector missing" >&2; exit 1; }
 [ ! -e "$root/var/lib/cnftctl/manifest" ] || { echo "legacy manifest location used" >&2; exit 1; }
 cp "$tmp/cnftctl-native" "$root/usr/bin/cnftctl"
 terminal=0123456789abcdef0123456789abcdef
@@ -108,6 +109,7 @@ expect_fail env CNFTCTL_INSTALL_ROOT="$root" CNFTCTL_TEST_SYSTEMD=1 CNFTCTL_SYST
 [ -x "$root/usr/bin/cnftctl" ] || { echo "failed uninstall removed assets" >&2; exit 1; }
 CNFTCTL_INSTALL_ROOT="$root" CNFTCTL_TEST_SYSTEMD=1 CNFTCTL_SYSTEMCTL="$tmp/systemctl" CNFTCTL_SYSTEMCTL_LOG="$systemctl_log" CNFTCTL_SYSTEMCTL_DISABLED=1 "$bundle/uninstall.sh" --force-inactive >/dev/null
 [ ! -e "$root/usr/bin/cnftctl" ] || { echo "binary survived uninstall" >&2; exit 1; }
+[ ! -e "$root/usr/lib/cnftctl/inspect-transaction" ] || { echo "transaction inspector survived uninstall" >&2; exit 1; }
 
 recover_root=$tmp/recover
 recover_id=33333333333333333333333333333333

@@ -108,4 +108,3 @@ support guarantee, and used at the operator's own risk.
 
 Decision: `APPROVE` for tagging and build-once promotion of candidate run
 `29291333684`. The final checkbox is intentionally pending publication.
-

@@ -113,16 +113,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Download unchanged architecture components
+      - name: Download unchanged amd64 component
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          pattern: cnftctl-${{ inputs.version }}-*
-          merge-multiple: true
-          path: candidate
+          name: cnftctl-${{ inputs.version }}-amd64
+          path: components/amd64
+      - name: Download unchanged arm64 component
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: cnftctl-${{ inputs.version }}-arm64
+          path: components/arm64
       - name: Verify and checksum closed candidate
         env:
           VERSION: ${{ inputs.version }}
         run: |
+          test "$(find components/amd64 -type f -printf '%P\n' | LC_ALL=C sort)" = "$(printf '%s\n' "cnftctl_${VERSION}_amd64.deb" sbom_amd64.spdx.json | LC_ALL=C sort)"
+          test "$(find components/arm64 -type f -printf '%P\n' | LC_ALL=C sort)" = "$(printf '%s\n' "cnftctl_${VERSION}_arm64.deb" sbom_arm64.spdx.json | LC_ALL=C sort)"
+          mkdir candidate
+          cp components/amd64/* components/arm64/* candidate/
           cd candidate
           test "$(find . -type f -printf '%P\n' | LC_ALL=C sort)" = "$(printf '%s\n' "cnftctl_${VERSION}_amd64.deb" "cnftctl_${VERSION}_arm64.deb" sbom_amd64.spdx.json sbom_arm64.spdx.json | LC_ALL=C sort)"
           find . -type f -printf '%P\n' | LC_ALL=C sort | xargs sha256sum >release-checksums.txt

@@ -133,7 +133,7 @@ jobs:
           cp components/amd64/* components/arm64/* candidate/
           cd candidate
           test "$(find . -type f -printf '%P\n' | LC_ALL=C sort)" = "$(printf '%s\n' "cnftctl_${VERSION}_amd64.deb" "cnftctl_${VERSION}_arm64.deb" sbom_amd64.spdx.json sbom_arm64.spdx.json | LC_ALL=C sort)"
-          find . -type f -printf '%P\n' | LC_ALL=C sort | xargs sha256sum >release-checksums.txt
+          sha256sum "cnftctl_${VERSION}_amd64.deb" "cnftctl_${VERSION}_arm64.deb" sbom_amd64.spdx.json sbom_arm64.spdx.json >release-checksums.txt
           test "$(wc -l <release-checksums.txt)" -eq 4
       - name: Upload immutable candidate
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

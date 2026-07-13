@@ -34,7 +34,7 @@ grep -q 'name: Release Candidate Build$' "$root/.github/workflows/release-build.
 # Match the signer identity emitted by attest-build-provenance for a build run
 # dispatched from protected main. Candidate run head_sha remains pinned to the
 # checked-out release tag commit by the promotion workflow.
-grep -q 'actions/workflows/release-build.yml@refs/heads/main' "$root/.github/workflows/release-promote.yml"
+grep -q '\.github/workflows/release-build.yml@refs/heads/main' "$root/.github/workflows/release-promote.yml"
 # Match literal GitHub expression syntax.
 # shellcheck disable=SC2016
 grep -q 'ref: v${{ inputs.version }}' "$root/.github/workflows/release-promote.yml"

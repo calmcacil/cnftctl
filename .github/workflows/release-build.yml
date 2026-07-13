@@ -76,11 +76,11 @@ jobs:
           tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner -C dist -czf "cnftctl-$VERSION-debian13-amd64.tar.gz" "cnftctl-$VERSION-debian13-amd64"
           sha256sum "cnftctl-$VERSION-debian13-amd64.tar.gz" sbom.spdx.json > release-checksums.txt
       - name: Attest bundle provenance
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.2.2
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
           subject-path: cnftctl-${{ inputs.version }}-debian13-amd64.tar.gz
       - name: Attest SBOM
-        uses: actions/attest-sbom@49f9f8f01a66efd2e17363a7f9b9f2ba56e9ac21 # v2.2.1
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
         with:
           subject-path: cnftctl-${{ inputs.version }}-debian13-amd64.tar.gz
           sbom-path: sbom.spdx.json

@@ -1,8 +1,8 @@
 # Exact Artifact Manual Validation
 
-Execute this checklist against the exact Debian package proposed for release, on disposable Debian 13 amd64 hosts with console access. Record the artifact filename, SHA-256, commit, tester, UTC timestamps, host image, nftables version, systemd version, Docker version when used, commands, outputs, and pass/fail evidence in the release issue.
+Execute this checklist against the exact Debian package proposed for release, on a disposable Debian 13 host of the matching architecture with console access. Record the artifact filename, architecture, SHA-256, commit, tester, UTC timestamps, host image, nftables version, systemd version, Docker version when used, commands, outputs, and pass/fail evidence in the release issue.
 
-The canonical artifact name is `cnftctl_VERSION_amd64.deb`. A version is unsupported until this checklist passes for those exact bytes; architecture documentation and code-test results are not substitutes.
+The production artifact name is `cnftctl_VERSION_amd64.deb`. The published `cnftctl_VERSION_arm64.deb` is experimental and must not be called supported until these exact bytes complete this entire checklist on a suitable arm64 host; architecture documentation and native CI are not substitutes.
 
 Use `docs/production-readiness.md` as the release gate and record results in `docs/validation-record.md`. This file supplies the executable host steps; all three documents must refer to the same artifact SHA-256.
 
@@ -12,16 +12,17 @@ Use two clean validation phases: `HOST_A` without Docker and `HOST_B` with a dis
 
 ```sh
 export VERSION=VERSION
-export ARTIFACT=$(realpath "cnftctl_${VERSION}_amd64.deb")
+export ARCH=${ARCH:-amd64}
+export ARTIFACT=$(realpath "cnftctl_${VERSION}_${ARCH}.deb")
 sha256sum "$ARTIFACT"
-sh ./scripts/verify-deb.sh "$ARTIFACT" "$VERSION"
+sh ./scripts/verify-deb.sh "$ARTIFACT" "$VERSION" "$ARCH"
 dpkg-deb --info "$ARTIFACT"
 dpkg-deb --contents "$ARTIFACT"
 ```
 
 - [ ] Package checksum matches published release evidence.
 - [ ] Package verification succeeds without network access.
-- [ ] Control metadata and the installed manifest identify package `cnftctl`, Debian 13, `amd64`, and the intended upstream and Debian versions.
+- [ ] Control metadata and the installed manifest identify package `cnftctl`, Debian 13, `$ARCH`, and the intended upstream and Debian versions.
 - [ ] The closed inventory and installed `SHA256SUMS` contain no unexpected executable or secret.
 
 ## Offline Package Contract
@@ -48,7 +49,7 @@ sudo cnftctl plan --output json | tee /tmp/plan.json
 sudo nft list tables | tee /tmp/tables-before-first-apply
 ```
 
-- [ ] Install rejects a non-Debian-13 or non-amd64 test root/host.
+- [ ] Install rejects a non-Debian-13 host, a mismatched architecture, and an unknown architecture.
 - [ ] Install does not create or load `inet hostfw`.
 - [ ] Install enables and starts boot reconciliation but leaves the firewall service disabled until a successful apply.
 - [ ] `init --dry-run` writes nothing.
@@ -232,7 +233,7 @@ journalctl -u cnftctl-ddns-refresh.service --no-pager
 Install the previous released package, create and confirm a generation, then install the candidate package.
 
 ```sh
-sudo apt install -y ./cnftctl_PREVIOUS_amd64.deb
+sudo apt install -y "./cnftctl_PREVIOUS_${ARCH}.deb"
 sudo cnftctl status
 sudo apt install -y "$ARTIFACT"
 sudo cnftctl status
@@ -248,6 +249,8 @@ sudo cnftctl rollback 2>/dev/null || true
 - [ ] Upgrade and uninstall consume the current pending-transaction contract; any mismatch or unsafe acceptance fails the artifact and must not be waived or edited in place.
 
 ## Release Gate
+
+For arm64, record every live item as `NOT EXERCISED`, never `PASS`, unless the exact package is being tested on a disposable Debian 13 arm64 host with independent console or rescue access. Graduation requires one exact released or candidate arm64 package to complete every mandatory section, including activation, rollback, reboot/recovery, DDNS, Docker coexistence, and uninstall.
 
 - [ ] `sh ./scripts/check.sh`, package build, lintian, staged validation, and delivery-asset verification pass for the tagged commit.
 - [ ] All checklist evidence is attached to the release issue and references the exact artifact SHA-256.

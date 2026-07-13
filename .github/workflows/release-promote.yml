@@ -55,19 +55,23 @@ jobs:
           relation=$(gh api "repos/$GITHUB_REPOSITORY/compare/$target_sha...main" --jq .status)
           case "$relation" in ahead|identical) ;; *) exit 1 ;; esac
           cd candidate
-          test "$(find . -type f -printf '%P\n' | LC_ALL=C sort)" = "$(printf '%s\n' "cnftctl_${VERSION}_amd64.deb" release-checksums.txt sbom.spdx.json | LC_ALL=C sort)"
+          test "$(find . -type f -printf '%P\n' | LC_ALL=C sort)" = "$(printf '%s\n' "cnftctl_${VERSION}_amd64.deb" "cnftctl_${VERSION}_arm64.deb" release-checksums.txt sbom_amd64.spdx.json sbom_arm64.spdx.json | LC_ALL=C sort)"
           test -z "$(find . -mindepth 1 -maxdepth 1 ! -type f -print -quit)"
           sha256sum --check release-checksums.txt
-          test "$(wc -l <release-checksums.txt)" -eq 2
+          test "$(wc -l <release-checksums.txt)" -eq 4
+          test "$(awk '{print $2}' release-checksums.txt | LC_ALL=C sort)" = "$(printf '%s\n' "cnftctl_${VERSION}_amd64.deb" "cnftctl_${VERSION}_arm64.deb" sbom_amd64.spdx.json sbom_arm64.spdx.json | LC_ALL=C sort)"
           signer_host=${GITHUB_SERVER_URL#https://}
-          gh attestation verify "cnftctl_${VERSION}_amd64.deb" \
-            --repo "$GITHUB_REPOSITORY" \
-            --signer-workflow "$signer_host/$GITHUB_REPOSITORY/.github/workflows/release-build.yml@refs/heads/main" \
-            --signer-digest "$target_sha" \
-            --source-digest "$target_sha" \
-            --source-ref refs/heads/main
+          for arch in amd64 arm64; do
+            gh attestation verify "cnftctl_${VERSION}_${arch}.deb" \
+              --repo "$GITHUB_REPOSITORY" \
+              --signer-workflow "$signer_host/$GITHUB_REPOSITORY/.github/workflows/release-build.yml@refs/heads/main" \
+              --signer-digest "$target_sha" \
+              --source-digest "$target_sha" \
+              --source-ref refs/heads/main
+          done
           cd ..
-          sh ./scripts/verify-deb.sh "candidate/cnftctl_${VERSION}_amd64.deb" "$VERSION"
+          sh ./scripts/verify-deb.sh "candidate/cnftctl_${VERSION}_amd64.deb" "$VERSION" amd64
+          sh ./scripts/verify-deb.sh "candidate/cnftctl_${VERSION}_arm64.deb" "$VERSION" arm64
       - name: Publish verified release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -75,6 +79,8 @@ jobs:
         run: |
           gh release create "v$VERSION" \
             "candidate/cnftctl_${VERSION}_amd64.deb" \
+            "candidate/cnftctl_${VERSION}_arm64.deb" \
             candidate/release-checksums.txt \
-            candidate/sbom.spdx.json \
+            candidate/sbom_amd64.spdx.json \
+            candidate/sbom_arm64.spdx.json \
             --verify-tag --generate-notes

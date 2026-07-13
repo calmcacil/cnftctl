@@ -1,6 +1,6 @@
 # Production Readiness Status
 
-This is the canonical gate for the first supported release. A version is supported only after the exact `cnftctl_VERSION_amd64.deb` bytes pass every mandatory check below on Debian 13 amd64. Source checks and results from another delivery format are not substitutes.
+This is the canonical gate for production-supported releases. A version is supported only after the exact `cnftctl_VERSION_amd64.deb` bytes pass every mandatory check below on Debian 13 amd64. Source checks and results from another delivery format are not substitutes. Published arm64 packages remain experimental until they independently complete the full gate described in `docs/manual-validation.md`.
 
 ## Current State
 
@@ -13,6 +13,11 @@ candidate is historical evidence only and will not be published.
 recovery, build-once promotion, and public-download verification are complete.
 The sanitized evidence and retained output index are recorded in release
 evidence issue #8.
+
+The arm64 implementation is available for the next release, but live arm64
+firewall validation is `NOT EXERCISED`. This document's checked items remain
+the historical v0.1.0 amd64 record; they do not pre-approve a later package.
+Every later amd64 candidate must complete the exact-artifact gate again.
 
 The evidence PR lands after the build-once candidate and therefore advances
 `main`. The `v0.1.0` tag must still point to recorded candidate commit
@@ -103,7 +108,7 @@ Do not publish when a mandatory check fails; artifact identity differs between C
 ## Deferred Work
 
 - Docker external IPv6 qualification and supported daemon-backend migration.
-- Debian 13 arm64, other distributions, non-systemd systems, RPMs, and an APT repository.
+- Live Debian 13 arm64 qualification, other distributions, non-systemd systems, RPMs, and an APT repository.
 - Independent long-lived signing keys beyond GitHub attestations and release checksums.
 - SSH-disabled mode, fleet APIs, generic nftables management, and additional `openat2` state-path confinement.
 

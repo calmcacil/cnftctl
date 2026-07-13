@@ -8,13 +8,16 @@ Copy this file into the release issue or a version-specific evidence document. D
 | --- | --- |
 | Version/tag | `RECORD_AT_VALIDATION` |
 | Commit SHA | `RECORD_AT_VALIDATION` |
-| Artifact filename | `cnftctl_VERSION_amd64.deb` |
-| Artifact byte size | `RECORD_AT_VALIDATION` |
-| Artifact SHA-256 | `RECORD_AT_VALIDATION` |
+| amd64 artifact filename | `cnftctl_VERSION_amd64.deb` |
+| amd64 artifact byte size | `RECORD_AT_VALIDATION` |
+| amd64 artifact SHA-256 | `RECORD_AT_VALIDATION` |
+| arm64 artifact filename | `cnftctl_VERSION_arm64.deb` |
+| arm64 artifact byte size | `RECORD_AT_VALIDATION` |
+| arm64 artifact SHA-256 | `RECORD_AT_VALIDATION` |
 | Build workflow/run | `RECORD_AT_VALIDATION` |
 | Go toolchain | `RECORD_AT_VALIDATION` |
-| SBOM identity | `RECORD_AT_VALIDATION` |
-| Provenance identity | `RECORD_AT_VALIDATION` |
+| SBOM identities | `sbom_amd64.spdx.json` / `sbom_arm64.spdx.json`; `RECORD_AT_VALIDATION` |
+| Provenance identities | `RECORD_AT_VALIDATION` |
 | Artifact producer | `RECORD_AT_VALIDATION` |
 | Candidate self-review | `RECORD_AT_VALIDATION` |
 
@@ -106,6 +109,17 @@ Evidence: `RECORD_AT_VALIDATION`
 | Experimental platforms | `RECORD` |
 | Vulnerability exceptions | `RECORD OR NONE` |
 | Other unexercised behavior | `RECORD OR NONE` |
+
+## Experimental arm64 Validation
+
+Until an exact arm64 package completes the full checklist on a disposable
+Debian 13 arm64 host with independent console or rescue access, record every
+live item as `NOT EXERCISED`, never `PASS`. Native CI, package lifecycle tests,
+and successful execution on a CI runner are compatibility evidence only.
+
+Arm64 live result: `NOT EXERCISED / PASS / FAIL`
+
+Evidence and rationale: `RECORD`
 
 ## Final Decision
 

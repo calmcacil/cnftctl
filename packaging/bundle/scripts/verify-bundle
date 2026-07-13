@@ -12,7 +12,10 @@ mkdir -m 0700 "$tmp"
 [ -f "$checksums" ] || { echo "missing SHA256SUMS" >&2; exit 1; }
 grep -qx 'format=1' "$manifest" || { echo "unsupported manifest format" >&2; exit 1; }
 grep -qx 'product=cnftctl' "$manifest" || { echo "wrong bundle product" >&2; exit 1; }
-grep -qx 'architecture=amd64' "$manifest" || { echo "unsupported bundle architecture" >&2; exit 1; }
+arch=$(sed -n 's/^architecture=//p' "$manifest")
+case $arch in amd64|arm64) ;; *) echo "unsupported bundle architecture" >&2; exit 1 ;; esac
+target_arch=${CNFTCTL_BUNDLE_ARCH:-$(dpkg --print-architecture)}
+[ "$target_arch" = "$arch" ] || { echo "bundle architecture $arch does not match target architecture $target_arch" >&2; exit 1; }
 grep -qx 'os=debian-13' "$manifest" || { echo "unsupported bundle OS" >&2; exit 1; }
 grep -Eq '^version=[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$' "$manifest" || {
     echo "invalid bundle version" >&2

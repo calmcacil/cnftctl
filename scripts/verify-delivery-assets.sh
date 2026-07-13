@@ -46,7 +46,10 @@ grep -q -- '--source-ref refs/heads/main' "$root/.github/workflows/release-promo
 grep -q 'ref: v${{ inputs.version }}' "$root/.github/workflows/release-promote.yml"
 # Match literal GitHub expression syntax.
 # shellcheck disable=SC2016
-grep -q 'cnftctl_${{ inputs.version }}_amd64.deb' "$root/.github/workflows/release-build.yml"
+grep -q 'cnftctl_${{ inputs.version }}_${{ matrix.arch }}.deb' "$root/.github/workflows/release-build.yml"
+grep -q 'ubuntu-24.04-arm' "$root/.github/workflows/ci.yml" "$root/.github/workflows/release-build.yml"
+# shellcheck disable=SC2016
+grep -q 'cnftctl_${VERSION}_arm64.deb' "$root/.github/workflows/release-promote.yml"
 
 sh "$root/packaging/test-bundle.sh"
 sh "$root/packaging/test-deb.sh"

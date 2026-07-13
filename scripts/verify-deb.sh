@@ -1,12 +1,14 @@
 #!/bin/sh
 set -eu
 
-if [ "$#" -ne 2 ]; then
-    echo "usage: $0 PACKAGE.deb UPSTREAM-VERSION" >&2
+if [ "$#" -ne 3 ]; then
+    echo "usage: $0 PACKAGE.deb UPSTREAM-VERSION ARCH" >&2
     exit 2
 fi
 deb=$1
 version=$2
+arch=$3
+case $arch in amd64|arm64) ;; *) echo "architecture must be amd64 or arm64: $arch" >&2; exit 2 ;; esac
 [ -f "$deb" ] || { echo "package is unavailable: $deb" >&2; exit 1; }
 
 base=${version%%+*}
@@ -19,7 +21,7 @@ esac
 
 [ "$(dpkg-deb -f "$deb" Package)" = cnftctl ] || { echo "wrong package name" >&2; exit 1; }
 [ "$(dpkg-deb -f "$deb" Version)" = "$deb_version" ] || { echo "wrong package version" >&2; exit 1; }
-[ "$(dpkg-deb -f "$deb" Architecture)" = amd64 ] || { echo "wrong package architecture" >&2; exit 1; }
+[ "$(dpkg-deb -f "$deb" Architecture)" = "$arch" ] || { echo "wrong package architecture" >&2; exit 1; }
 [ "$(dpkg-deb -f "$deb" Depends)" = "nftables, systemd" ] || { echo "wrong package dependencies" >&2; exit 1; }
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/cnftctl-deb-verify.XXXXXX")
@@ -66,6 +68,11 @@ cmp -s "$tmp/expected" "$tmp/actual" || { echo "package file inventory mismatch"
     exit 1
 }
 for script in postinst postrm preinst prerm; do [ "$(stat -c %a "$control/$script")" = 755 ] || { echo "wrong maintainer script mode: $script" >&2; exit 1; }; done
+grep -Fqx "package_arch=$arch" "$control/preinst" || { echo "pre-install architecture guard mismatch" >&2; exit 1; }
+! grep -q '@ARCH@' "$control/preinst" || { echo "unexpanded pre-install architecture token" >&2; exit 1; }
+if [ "$arch" = arm64 ]; then
+    grep -q 'EXPERIMENTAL.*use at your own risk' "$control/preinst" || { echo "arm64 installation warning missing" >&2; exit 1; }
+fi
 find "$root" -type d -print | while IFS= read -r path; do
     [ "$(stat -c %a "$path")" = 755 ] || { echo "wrong package directory mode: $path" >&2; exit 1; }
 done
@@ -79,7 +86,7 @@ done
 
 grep -qx 'format=1' "$root/var/lib/cnftctl/delivery/manifest"
 grep -qx 'product=cnftctl' "$root/var/lib/cnftctl/delivery/manifest"
-grep -qx 'architecture=amd64' "$root/var/lib/cnftctl/delivery/manifest"
+grep -qx "architecture=$arch" "$root/var/lib/cnftctl/delivery/manifest"
 grep -qx 'os=debian-13' "$root/var/lib/cnftctl/delivery/manifest"
 grep -qx "version=$version" "$root/var/lib/cnftctl/delivery/manifest"
 
@@ -95,7 +102,13 @@ while read -r expected logical; do
     [ "$actual" = "$expected" ] || { echo "installed checksum mismatch: $logical" >&2; exit 1; }
 done <"$root/var/lib/cnftctl/delivery/SHA256SUMS"
 
-if [ "$(dpkg --print-architecture)" = amd64 ]; then
+machine=$(readelf -h "$root/usr/bin/cnftctl" | sed -n 's/^ *Machine: *//p')
+case $arch:$machine in
+    amd64:'Advanced Micro Devices X86-64'|arm64:AArch64) ;;
+    *) echo "wrong binary ELF architecture for $arch: $machine" >&2; exit 1 ;;
+esac
+
+if [ "$(dpkg --print-architecture)" = "$arch" ]; then
     [ "$("$root/usr/bin/cnftctl" --version)" = "cnftctl $version" ] || { echo "binary version mismatch" >&2; exit 1; }
 fi
 

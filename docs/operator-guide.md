@@ -5,10 +5,13 @@
 Download the Debian package, checksums, and provenance from the same release. Verify and install the package:
 
 ```sh
+sha256sum --ignore-missing --check release-checksums.txt
 sha256sum --check release-checksums.txt
-gh attestation verify cnftctl_VERSION_amd64.deb --repo calmcacil/cnftctl
-sudo apt install ./cnftctl_VERSION_amd64.deb
+gh attestation verify "cnftctl_VERSION_$(dpkg --print-architecture).deb" --repo calmcacil/cnftctl
+sudo apt install "./cnftctl_VERSION_$(dpkg --print-architecture).deb"
 ```
+
+Use `sbom_amd64.spdx.json` with the production-supported amd64 package or `sbom_arm64.spdx.json` with the experimental arm64 package. Arm64 is unvalidated on a disposable live host, is not production-supported, and is used at your own risk; its installer repeats this warning.
 
 Installation deploys `/usr/bin/cnftctl`, fixed units under `/usr/lib/systemd/system`, and delivery metadata under `/var/lib/cnftctl`. It enables only boot reconciliation and does not activate firewall policy or DDNS. At boot and after policy transitions, reconciliation derives whether the DDNS timer runs from the selected active generation, never from unapplied desired config.
 

@@ -1,17 +1,19 @@
 #!/bin/sh
 set -eu
 
-if [ "$#" -ne 2 ]; then
-    echo "usage: $0 VERSION OUTPUT.deb" >&2
+if [ "$#" -ne 3 ]; then
+    echo "usage: $0 VERSION ARCH OUTPUT.deb" >&2
     exit 2
 fi
 
 version=$1
-out=$2
+arch=$2
+out=$3
 printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$' || {
     echo "version must be SemVer without a leading v: $version" >&2
     exit 2
 }
+case $arch in amd64|arm64) ;; *) echo "architecture must be amd64 or arm64: $arch" >&2; exit 2 ;; esac
 [ ! -e "$out" ] || { echo "output already exists: $out" >&2; exit 1; }
 
 base=${version%%+*}
@@ -31,7 +33,7 @@ pkg=$tmp/pkg
 epoch=${SOURCE_DATE_EPOCH:-$(git -C "$src" log -1 --format=%ct)}
 case $epoch in *[!0-9]*|'') echo "SOURCE_DATE_EPOCH must be a non-negative integer" >&2; exit 2 ;; esac
 
-sh "$src/scripts/build-bundle.sh" "$version" "$bundle"
+sh "$src/scripts/build-bundle.sh" "$version" "$arch" "$bundle"
 mkdir -p "$pkg/DEBIAN" "$pkg/usr/bin" "$pkg/usr/lib/cnftctl" \
     "$pkg/usr/lib/systemd/system" "$pkg/usr/share/doc/cnftctl" \
     "$pkg/usr/share/lintian/overrides" "$pkg/usr/share/man/man1" \
@@ -55,9 +57,9 @@ gzip -9n <"$tmp/changelog.Debian" >"$pkg/usr/share/doc/cnftctl/changelog.gz"
 gzip -9n <"$src/packaging/debian/cnftctl.1" >"$pkg/usr/share/man/man1/cnftctl.1.gz"
 chmod 0644 "$pkg/usr/share/doc/cnftctl/changelog.gz" "$pkg/usr/share/man/man1/cnftctl.1.gz"
 
-for script in preinst postinst prerm postrm; do
-    install -m 0755 "$src/packaging/debian/$script" "$pkg/DEBIAN/$script"
-done
+sed "s/@ARCH@/$arch/g" "$src/packaging/debian/preinst" >"$pkg/DEBIAN/preinst"
+chmod 0755 "$pkg/DEBIAN/preinst"
+for script in postinst prerm postrm; do install -m 0755 "$src/packaging/debian/$script" "$pkg/DEBIAN/$script"; done
 
 hashes=$tmp/SHA256SUMS
 hash_entry() { sha256sum "$1" | sed "s|  .*|  $2|" >>"$hashes"; }
@@ -71,7 +73,7 @@ LC_ALL=C sort "$hashes" >"$pkg/var/lib/cnftctl/delivery/SHA256SUMS"
 chmod 0644 "$pkg/var/lib/cnftctl/delivery/SHA256SUMS"
 
 installed_size=$(du -sk "$pkg" | awk '{print $1}')
-sed -e "s/@DEBIAN_VERSION@/$deb_version/g" -e "s/@INSTALLED_SIZE@/$installed_size/" \
+sed -e "s/@DEBIAN_VERSION@/$deb_version/g" -e "s/@INSTALLED_SIZE@/$installed_size/" -e "s/@ARCH@/$arch/g" \
     "$src/packaging/debian/control.in" >"$pkg/DEBIAN/control"
 chmod 0644 "$pkg/DEBIAN/control"
 

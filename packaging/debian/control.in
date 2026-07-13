@@ -2,12 +2,13 @@ Package: cnftctl
 Version: @DEBIAN_VERSION@
 Section: admin
 Priority: optional
-Architecture: amd64
+Architecture: @ARCH@
 Maintainer: Calmcacil B. <716671+calmcacil@users.noreply.github.com>
 Homepage: https://github.com/calmcacil/cnftctl
 Depends: nftables, systemd
 Installed-Size: @INSTALLED_SIZE@
 Description: guarded nftables host firewall manager
- cnftctl manages the application-owned inet hostfw nftables profile on
- Debian 13 amd64. It provides immutable policy generations, systemd-owned
- rollback, optional DDNS SSH allowlists, and strict Docker WAN gating.
+ cnftctl manages the application-owned inet hostfw nftables profile on Debian
+ 13 on amd64 or arm64. It provides immutable policy generations,
+ systemd-owned rollback, optional DDNS SSH allowlists, and strict Docker WAN
+ gating.

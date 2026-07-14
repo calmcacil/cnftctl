@@ -10,9 +10,11 @@ cnftctl \- guarded nftables host firewall manager
 .B cnftctl
 manages the application-owned
 .B inet hostfw
-nftables profile on Debian 13 amd64. Desired configuration is separate from
-immutable active generations. Every live policy change arms a systemd-owned
-rollback and requires explicit confirmation.
+nftables profile on Debian 13. Amd64 is production-supported; arm64 packages
+are experimental, unvalidated on a disposable live host, and used at the
+operator's own risk. Desired configuration is separate from immutable active
+generations. Every live policy change arms a systemd-owned rollback and
+requires explicit confirmation.
 .SH SAFETY
 Arrange tested console or rescue access before applying remote firewall
 changes. The rollback timeout cannot be bypassed. Docker integration and
@@ -27,6 +29,15 @@ Immutable generations, transaction audit state, and active selection.
 .TP
 .I /usr/share/doc/cnftctl/operator-guide.md
 Complete operating instructions.
+.TP
+.I /usr/share/doc/cnftctl/commands.md
+Command-by-command reference and examples.
+.TP
+.I /usr/share/doc/cnftctl/install.md
+Verified package installation and first activation.
+.TP
+.I /usr/share/doc/cnftctl/uninstall.md
+Guarded retirement and package removal.
 .SH SEE ALSO
 .BR nft (8),
 .BR systemctl (1),

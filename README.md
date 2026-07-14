@@ -1,6 +1,6 @@
 # cnftctl
 
-> Install only a published Debian package whose checksum and GitHub attestation you have verified. See `docs/production-readiness.md` and `docs/validation-record-0.1.0.md` for current release evidence.
+> Install only a published Debian package whose checksum and GitHub attestation you have verified. See `docs/production-readiness.md` and `docs/validation-record-0.2.0.md` for current release evidence.
 
 > **Personal-use and trust disclaimer:** This project was created primarily for personal use. Best efforts have been made to design, test, document, and validate it safely, but firewall software can cause loss of access or unintended network exposure. Each user is responsible for reviewing the source, release evidence, configuration, and operational safeguards and deciding whether they trust it for their own environment. Use it at your own risk; do not treat the existence of tests, published packages, or validation records as a substitute for your own assessment and recovery plan.
 
@@ -35,6 +35,11 @@ An expired first-install transaction deletes only `inet hostfw`. A later expired
 
 ## Install A Release Package
 
+The complete walkthrough is [How To Install cnftctl](docs/install.md), including
+host checks, architecture-specific downloads, checksum/SBOM/attestation
+verification, the inert package install, and first activation. The current
+release is [v0.2.0](https://github.com/calmcacil/cnftctl/releases/tag/v0.2.0).
+
 Download the package, matching architecture-named SBOM, and `release-checksums.txt` from the same GitHub release. For production-supported amd64:
 
 ```sh
@@ -54,6 +59,10 @@ sudo apt install ./cnftctl_VERSION_arm64.deb
 The matching SBOM is `sbom_arm64.spdx.json`, and installation emits an explicit experimental-risk warning. Do not mix package and SBOM architectures.
 
 Each package enforces Debian 13 and its matching architecture, installs the binary, recovery helper, integrity inventory, documentation, and systemd units, and enables only boot reconciliation. It does not activate firewall policy, enable DDNS, or restart Docker. Package upgrades and removals refuse unresolved transaction state; removal also refuses while `inet hostfw` is active. Both `apt remove` and `apt purge` preserve `/etc/cnftctl` and `/var/lib/cnftctl`.
+
+For the guarded active-policy retirement procedure, see
+[How To Uninstall cnftctl](docs/uninstall.md). Do not bypass the package guard
+while `inet hostfw` is active.
 
 ## First Policy
 
@@ -121,8 +130,8 @@ Use `journalctl -u cnftctl-firewall.service`, `journalctl -u cnftctl-reconcile.s
 ```sh
 sh ./scripts/check.sh
 go build -o ./bin/cnftctl ./cmd/cnftctl
-sh ./scripts/build-deb.sh 0.1.0 amd64 ./cnftctl_0.1.0_amd64.deb
-sh ./scripts/build-deb.sh 0.1.0 arm64 ./cnftctl_0.1.0_arm64.deb
+sh ./scripts/build-deb.sh 0.2.0 amd64 ./cnftctl_0.2.0_amd64.deb
+sh ./scripts/build-deb.sh 0.2.0 arm64 ./cnftctl_0.2.0_arm64.deb
 ```
 
 The bundle builder and reference files remain internal staging and sanitized behavior baselines, not supported installation paths. Contribution terms are in `CONTRIBUTING.md`, vulnerability reporting is in `SECURITY.md`, and third-party attribution is in `THIRD_PARTY_NOTICES.md`.
@@ -130,10 +139,13 @@ The bundle builder and reference files remain internal staging and sanitized beh
 ## Documentation
 
 - `SPEC.md`: implemented architecture and invariants.
-- `docs/operator-guide.md`: install, operation, logging, upgrades, uninstall, and recovery.
+- `docs/install.md`: architecture-specific verified installation and first activation.
+- `docs/uninstall.md`: safe inactive and active-policy package removal.
+- `docs/commands.md`: complete command reference, examples, risks, and exit codes.
+- `docs/operator-guide.md`: operating model, logging, upgrades, and recovery.
 - `docs/manual-validation.md`: executable validation checklist for an exact release artifact.
 - `docs/support-matrix.md`: supported and unsupported environments.
 - `docs/incident-response.md`: lockout, rollback, boot, DDNS, and Docker runbooks.
 - `docs/release-process.md`: release evidence and publication procedure.
-- `docs/release-notes.md`: current candidate identity, evidence, and limitations.
-- `docs/validation-record-0.1.0.md`: exact-package HOST_A/HOST_B validation record.
+- `docs/release-notes.md`: current release identity, evidence, and limitations.
+- `docs/validation-record-0.2.0.md`: current exact-package HOST_A/HOST_B validation record.

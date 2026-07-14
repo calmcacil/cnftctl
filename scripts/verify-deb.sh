@@ -50,11 +50,14 @@ usr/lib/systemd/system/cnftctl-rollback@.timer
 usr/share/doc/cnftctl/LICENSE
 usr/share/doc/cnftctl/THIRD_PARTY_NOTICES.md
 usr/share/doc/cnftctl/changelog.gz
+usr/share/doc/cnftctl/commands.md
 usr/share/doc/cnftctl/copyright
 usr/share/doc/cnftctl/incident-response.md
+usr/share/doc/cnftctl/install.md
 usr/share/doc/cnftctl/manual-validation.md
 usr/share/doc/cnftctl/operator-guide.md
 usr/share/doc/cnftctl/support-matrix.md
+usr/share/doc/cnftctl/uninstall.md
 usr/share/lintian/overrides/cnftctl
 usr/share/man/man1/cnftctl.1.gz
 var/lib/cnftctl/delivery/SHA256SUMS

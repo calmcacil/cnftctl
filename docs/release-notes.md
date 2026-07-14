@@ -58,8 +58,11 @@ expansion.
 - Docker IPv4 external WAN gate and coexistence: `PASS`.
 - Docker IPv6 external traffic: `NOT EXERCISED`.
 - Live arm64 firewall validation: `NOT EXERCISED`.
-- Publication and public-download verification: pending tag/promotion.
+- Publication and independent public-download verification: `PASS`.
+- Release: [v0.2.0](https://github.com/calmcacil/cnftctl/releases/tag/v0.2.0).
+- Promotion run: [29294419952](https://github.com/calmcacil/cnftctl/actions/runs/29294419952).
 
 Detailed sanitized evidence is in `docs/validation-record-0.2.0.md` and release
-evidence issue #18. Raw host logs and archived audit state are retained
-privately; credentials, hostnames, addresses, and trust values are excluded.
+evidence issue [#18](https://github.com/calmcacil/cnftctl/issues/18). Raw host
+logs and archived audit state are retained privately; credentials, hostnames,
+addresses, and trust values are excluded.

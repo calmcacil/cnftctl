@@ -23,7 +23,9 @@ cp "$src"/deploy/systemd/* "$out/systemd/"
 cp "$src"/packaging/bundle/scripts/* "$out/scripts/"
 cp "$src/packaging/bundle/install.sh" "$src/packaging/bundle/uninstall.sh" "$out/"
 cp "$src/LICENSE" "$src/THIRD_PARTY_NOTICES.md" "$out/"
-cp "$src/docs/operator-guide.md" "$src/docs/manual-validation.md" "$src/docs/incident-response.md" "$src/docs/support-matrix.md" "$out/docs/"
+cp "$src/docs/install.md" "$src/docs/uninstall.md" "$src/docs/commands.md" \
+    "$src/docs/operator-guide.md" "$src/docs/manual-validation.md" \
+    "$src/docs/incident-response.md" "$src/docs/support-matrix.md" "$out/docs/"
 sed -e "s/@VERSION@/$version/" -e "s/@ARCH@/$arch/" "$src/packaging/bundle/manifest" >"$out/manifest"
 chmod 0755 "$out/bin/cnftctl" "$out/install.sh" "$out/uninstall.sh" "$out/scripts/"*
 chmod 0644 "$out/manifest" "$out/LICENSE" "$out/THIRD_PARTY_NOTICES.md" "$out/docs/"* "$out/systemd/"*

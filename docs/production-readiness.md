@@ -5,28 +5,23 @@ This is the canonical gate for production-supported releases. A version is suppo
 ## Current State
 
 The native Debian package implementation, protected-branch workflow, automated
-gate, and disposable-host HOST_A/HOST_B validation are complete. The canonical
-candidate is recorded in `docs/validation-record-0.1.0.md`. The earlier tar
-candidate is historical evidence only and will not be published.
+gate, and disposable-host HOST_A/HOST_B validation are complete. Historical
+v0.1.0 evidence remains in `docs/validation-record-0.1.0.md`; the earlier tar
+candidate is historical evidence only and was not published.
 
 `v0.1.0` is published and supported. Technical validation, provider-KVM
 recovery, build-once promotion, and public-download verification are complete.
 The sanitized evidence and retained output index are recorded in release
 evidence issue #8.
 
-The arm64 implementation is available for the next release, but live arm64
-firewall validation is `NOT EXERCISED`. This document's checked items remain
-the historical v0.1.0 amd64 record; they do not pre-approve a later package.
-Every later amd64 candidate must complete the exact-artifact gate again.
+`v0.2.0` is published and production-supported on amd64. Its exact amd64
+package completed the repeated gate on 2026-07-13; immutable identity, host
+results, promotion run, and independent public-download verification are in
+`docs/validation-record-0.2.0.md`. The released arm64 package remains
+experimental and its live firewall checklist remains `NOT EXERCISED`.
 
-The exact v0.2.0 amd64 candidate completed that repeated gate on 2026-07-13.
-Its immutable identity and results are recorded in
-`docs/validation-record-0.2.0.md`; tagging and promotion are pending. Arm64
-remains experimental and its live firewall checklist remains `NOT EXERCISED`.
-
-The evidence PR lands after the build-once candidate and therefore advances
-`main`. The `v0.1.0` tag must still point to recorded candidate commit
-`ee7ab0fd6932bafe1c22b684ec72e27e50803f94`; the promotion workflow explicitly
+Evidence may land after a build-once candidate and therefore advance `main`.
+Each version tag must still point to its recorded candidate commit; promotion
 permits `main` to be ahead while requiring exact tag/run commit identity.
 
 ## Mandatory Release Gate
@@ -42,11 +37,11 @@ Every artifact-dependent item must refer to the same package SHA-256. A package-
 
 ### 2. Build And Identify Exact Package
 
-- [x] Select the immutable `v0.1.0` source commit on `main`.
-- [x] Build `cnftctl_0.1.0_amd64.deb` once in the candidate workflow.
+- [x] Select immutable candidate commit `a2df7e38f77dba3b4dc236f7c3818c0b37749804` on `main` for `v0.2.0`.
+- [x] Build `cnftctl_0.2.0_amd64.deb` and experimental `cnftctl_0.2.0_arm64.deb` exactly once in their native candidate jobs.
 - [x] Record filename, byte size, SHA-256, commit, Go version, and build-run URL.
 - [x] Verify control metadata, closed inventory, modes, manifest, installed checksums, maintainer scripts, and embedded CLI version offline.
-- [x] Generate and retain the SPDX SBOM and keyless build provenance for the package bytes.
+- [x] Generate and retain architecture-matched SPDX SBOMs and keyless build provenance for both package byte streams.
 
 ### 3. Prepare Validation Host
 
@@ -99,12 +94,12 @@ Every artifact-dependent item must refer to the same package SHA-256. A package-
 
 ### 9. Record And Publish
 
-- [x] Complete `docs/validation-record-0.1.0.md` and record the retained output index in release evidence issue #8. Sensitive infrastructure values remain excluded by policy.
+- [x] Complete `docs/validation-record-0.2.0.md` and record the retained output index in release evidence issue #18. Sensitive infrastructure values remain excluded by policy.
 - [x] Record every limitation and `NOT EXERCISED` item in release notes.
 - [x] Self-review candidate identity, evidence, and publication inputs; no independent approval is required for this personal project.
-- [x] Tag the exact validated source commit as `v0.1.0`.
-- [x] Promote candidate run `29282503578` without rebuilding; promotion run `29287049593` passed.
-- [x] Download the public package in a package-clean Debian 13 environment and repeat checksum, provenance, package, installation, version, and removal verification.
+- [x] Tag the exact validated source commit as `v0.2.0`.
+- [x] Promote candidate run `29291333684` without rebuilding; promotion run `29294419952` passed.
+- [x] Download the exact five public assets independently and repeat inventory, checksum, package-manifest, attestation, and native arm64 version verification.
 
 ## Stop Conditions
 

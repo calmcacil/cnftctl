@@ -8,7 +8,7 @@ Each release publishes `cnftctl_VERSION_amd64.deb` and experimental `cnftctl_VER
 
 Production support is not established until the exact amd64 package bytes complete the evidence gate below on Debian 13 amd64. Arm64 remains experimental until one exact released or candidate package independently completes the same full checklist on a suitable disposable Debian 13 arm64 host with console or rescue access.
 
-The canonical remaining-work gate is `docs/production-readiness.md`. Record exact candidate and host results in `docs/validation-record.md`, using `docs/manual-validation.md` for executable steps.
+The canonical production-support gate is `docs/production-readiness.md`. Record exact candidate and host results in `docs/validation-record.md`, using `docs/manual-validation.md` for executable steps.
 
 ## Required Evidence
 

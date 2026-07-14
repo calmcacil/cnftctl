@@ -104,7 +104,11 @@ support guarantee, and used at the operator's own risk.
 - [x] Docker limitations and all `NOT EXERCISED` items are disclosed.
 - [x] Candidate identity matches build, host evidence, and publication inputs.
 - [x] Candidate evidence and limitations received explicit self-review.
-- [ ] Publicly downloaded bytes reverified after publication.
+- [x] Publicly downloaded bytes reverified after publication.
 
 Decision: `APPROVE` for tagging and build-once promotion of candidate run
-`29291333684`. The final checkbox is intentionally pending publication.
+`29291333684`. Promotion run `29294419952` verified and published the unchanged
+candidate. The five public assets were downloaded independently; inventory,
+sizes, checksums, both package manifests, and native arm64 version execution
+were reverified. Promotion verified both attestations against the recorded
+workflow and candidate/source digest.

@@ -1,12 +1,16 @@
 # Operator Guide
 
+Start with [How To Install](install.md), use the complete
+[Command Reference](commands.md) for command-by-command behavior, and follow
+[How To Uninstall](uninstall.md) for guarded retirement. This guide summarizes
+the ongoing operating model.
+
 ## Install And Upgrade
 
 Download the Debian package, checksums, and provenance from the same release. Verify and install the package:
 
 ```sh
 sha256sum --ignore-missing --check release-checksums.txt
-sha256sum --check release-checksums.txt
 gh attestation verify "cnftctl_VERSION_$(dpkg --print-architecture).deb" --repo calmcacil/cnftctl
 sudo apt install "./cnftctl_VERSION_$(dpkg --print-architecture).deb"
 ```
@@ -124,6 +128,10 @@ sudo apt remove cnftctl
 ```
 
 Both `apt remove` and `apt purge` remove delivery assets while preserving `/etc/cnftctl`, immutable generations, and audit evidence. Destructive state cleanup is a separate explicit operator action.
+
+See [How To Uninstall](uninstall.md) for the complete evidence capture,
+transaction resolution, targeted table deactivation, verification, and removal
+procedure.
 
 ## Recovery
 

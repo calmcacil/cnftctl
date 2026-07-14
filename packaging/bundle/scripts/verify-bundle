@@ -29,10 +29,13 @@ cat >"$tmp/expected" <<'EOF'
 LICENSE
 THIRD_PARTY_NOTICES.md
 bin/cnftctl
+docs/commands.md
 docs/incident-response.md
+docs/install.md
 docs/manual-validation.md
 docs/operator-guide.md
 docs/support-matrix.md
+docs/uninstall.md
 install.sh
 manifest
 scripts/cnftctl-recover
